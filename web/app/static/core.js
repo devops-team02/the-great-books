@@ -12,10 +12,8 @@ let housesList = [];
 let housesMap = {};
 
 async function apiFetch(endpoint, options = {}) {
-    const token = localStorage.getItem("token");
     const headers = {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: "Bearer " + token } : {}),
         ...options.headers
     };
 
@@ -97,17 +95,10 @@ async function loadDictionaries() {
 }
 
 async function checkAuth() {
-    const token = localStorage.getItem("token");
-    if (!token) {
-        updateNavUI(null);
-        return;
-    }
-
     try {
         currentUser = await apiFetch("/me");
         updateNavUI(currentUser);
     } catch (_) {
-        localStorage.removeItem("token");
         currentUser = null;
         updateNavUI(null);
     }
@@ -139,7 +130,6 @@ async function logout() {
     try {
         await apiFetch("/auth/logout", { method: "POST" });
     } catch (_) { }
-    localStorage.removeItem("token");
     currentUser = null;
     updateNavUI(null);
     showAlert("You have left the realm.");

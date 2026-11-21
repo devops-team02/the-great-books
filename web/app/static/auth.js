@@ -20,7 +20,6 @@ async function handleLogin(e) {
             method: "POST",
             body: JSON.stringify({ username, password })
         });
-        localStorage.setItem("token", res.token);
         await checkAuth();
         showAlert("Welcome back to the realm, " + res.user.username + "!");
         setTimeout(() => {
@@ -44,7 +43,6 @@ async function handleRegister(e) {
             method: "POST",
             body: JSON.stringify({ username, password, role_id, house_id })
         });
-        localStorage.setItem("token", res.token);
         await checkAuth();
         showAlert("Oath sworn! Account created for " + res.user.username + ".");
         setTimeout(() => {

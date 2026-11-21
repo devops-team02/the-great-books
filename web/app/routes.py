@@ -1,12 +1,23 @@
 import secrets
 from datetime import datetime, timedelta
 from functools import wraps
-from flask import Blueprint, request, jsonify, render_template
+from flask import Blueprint, request, jsonify, render_template, redirect, url_for, make_response
 from werkzeug.security import generate_password_hash, check_password_hash
 from .extensions import db
 from .models import User, Role, House, Stat, Session
 
 web_ui = Blueprint("web_ui", __name__, url_prefix="/")
+
+@web_ui.before_request
+def require_auth():
+    if request.path == "/login" or request.path.startswith("/static"):
+        return None
+    token = request.cookies.get("token")
+    if not token:
+        return redirect(url_for("web_ui.login"))
+    session_obj = Session.query.filter_by(id=token).first()
+    if not session_obj or session_obj.expires_at <= datetime.utcnow():
+        return redirect(url_for("web_ui.login"))
 
 @web_ui.route("/")
 @web_ui.route("/houses")
@@ -34,8 +45,7 @@ api = Blueprint("api", __name__, url_prefix="/api")
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        auth_header = request.headers.get("Authorization", "")
-        token = auth_header.replace("Bearer ", "").strip()
+        token = request.cookies.get("token", "")
         if not token:
             return jsonify({"error": "Missing session token"}), 401
 
@@ -135,16 +145,23 @@ def register():
     db.session.add(new_session)
     db.session.commit()
 
-    return jsonify({
+    response = make_response(jsonify({
         "message": "Registered successfully",
-        "token": token,
         "user": {
             "id": user.id,
             "username": user.username,
             "role": role.role_name,
             "house_id": user.house_id,
         }
-    }), 201
+    }), 201)
+    response.set_cookie(
+        "token", token,
+        httponly=True,
+        path="/",
+        samesite="Lax",
+        max_age=86400
+    )
+    return response
 
 
 @api.route("/auth/login", methods=["POST"])
@@ -167,26 +184,35 @@ def login():
     db.session.add(new_session)
     db.session.commit()
 
-    return jsonify({
-        "token": token,
+    response = make_response(jsonify({
         "user": {
             "id": user.id,
             "username": user.username,
             "role": user.role.role_name,
             "house_id": user.house_id,
         }
-    }), 200
+    }), 200)
+    response.set_cookie(
+        "token", token,
+        httponly=True,
+        path="/",
+        samesite="Lax",
+        max_age=86400
+    )
+    return response
 
 
 @api.route("/auth/logout", methods=["POST"])
 @login_required
 def logout(current_user):
-    token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
+    token = request.cookies.get("token", "")
     session = Session.query.filter_by(id=token).first()
     if session:
         session.expires_at = datetime.utcnow()
         db.session.commit()
-    return jsonify({"message": "Logged out"}), 200
+    response = make_response(jsonify({"message": "Logged out"}), 200)
+    response.set_cookie("token", "", max_age=0, path="/", httponly=True, samesite="Lax")
+    return response
 
 
 @api.route("/me", methods=["GET"])
