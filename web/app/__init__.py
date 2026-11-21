@@ -1,4 +1,5 @@
 from flask import Flask
+from werkzeug.middleware.proxy_fix import ProxyFix
 from .config import Config
 from .extensions import db, cors, migrate
 from .routes import api, web_ui
@@ -7,6 +8,7 @@ from .models import Role, House
 
 def create_app():
     app = Flask(__name__)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
     app.config.from_object(Config)
 
     db.init_app(app)
