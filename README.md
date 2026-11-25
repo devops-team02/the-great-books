@@ -142,9 +142,11 @@ The application provides a server-rendered web interface with authentication gua
 
 - `GET /login` - Login and registration form (public)
 - `GET /` or `GET /houses` - Main dashboard showing houses, mottos, and lords
+- `GET /house` - Current user's House view (members roster, join applications, manage/leave house)
 - `GET /knights` - Knights list (visible combat stats depends on house membership / gossip)
 - `GET /lords` - Lords view and house administration
 - `GET /profile` - User profile, current stats, and Knight gossip key generation
+- `GET /nightwatch` - The Wall page for exiled/banished characters
 
 ---
 
@@ -199,5 +201,20 @@ The application provides a server-rendered web interface with authentication gua
   - Returns `403` if user is not a member of the requested house
 - `PUT/PATCH /api/houses/<house_id>` - update house name and/or motto
   - Cookie: `token=<token>`
-  - Body (JSON): `name` (string, optional, max 50 chars), `motto` (string, optional, max 100 chars)
+  - Body (JSON): `name` (string, optional, 5-20 chars), `motto` (string, optional, 5-30 chars)
   - Returns `403` if user is not a noble or lord of this house, `409` if name is already taken
+- `GET /api/houses/<house_id>` - get specific house info by its ID
+  - Cookie: `token=<token>`
+  - Returns `404` if house not found
+- `GET /api/house` - get current authenticated user's sworn house info
+  - Cookie: `token=<token>`
+  - Returns `404` if user is not sworn to any house
+- `POST /api/house/leave` - renounce allegiance and leave current house
+  - Cookie: `token=<token>`
+  - Returns `400` if user does not belong to any house
+- `POST /api/houses/<house_id>/kick/<target_id>` - cast out a member from the house (Lords only)
+  - Cookie: `token=<token>`
+  - Returns `403` if requester is not a noble lord of this house, `400` if trying to kick self, `404` if member not found in house
+- `POST /api/nightwatch/<target_id>` - banish an offender to the Night's Watch (Lords only)
+  - Cookie: `token=<token>`
+  - Returns `403` if not a noble or trying to ban a noble/knight of another house, `400` if trying to ban self
