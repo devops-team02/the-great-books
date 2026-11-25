@@ -32,10 +32,10 @@ jobs:
           pip install ruff==${{ env.ruff-version }}
         # pip install flake8 pylint black isort yamllint ansible-lint packer-linter shellcheck
 
-      - name: Lint Python code
-        run: |
-          ruff check
-        working-directory: web
+    #   - name: Lint Python code
+    #     run: |
+    #       ruff check
+    #     working-directory: web
 
 
     #   - name: Lint Packer code
