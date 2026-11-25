@@ -324,6 +324,27 @@ body {
     margin-top: 0.6rem;
     width: 100%;
     padding: 0.45rem;
+    background: rgba(58, 123, 213, 0.14);
+    border: 1px solid #4a90e2;
+    color: #64b5f6;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: 0.2s;
+}
+
+.btn-ban:hover {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #fff;
+    box-shadow: 0 0 10px rgba(37, 99, 235, 0.4);
+}
+
+.btn-kick {
+    margin-top: 0.6rem;
+    width: 100%;
+    padding: 0.45rem;
     background: rgba(184, 50, 50, 0.14);
     border: 1px solid var(--danger);
     color: #ff6b6b;
@@ -334,9 +355,137 @@ body {
     transition: 0.2s;
 }
 
-.btn-ban:hover {
+.btn-kick:hover {
     background: var(--danger);
+    border-color: var(--danger);
     color: #fff;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+/* Applications List & Cards */
+.applications-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+}
+
+.application-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    width: 100%;
+    transition: 0.2s ease;
+}
+
+.application-card:hover {
+    border-color: rgba(201, 162, 39, 0.4);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.application-info {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.application-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.application-name-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.application-name {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--gold);
+}
+
+.application-stats {
+    display: flex;
+    gap: 0.75rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    background: var(--bg-input);
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    width: fit-content;
+}
+
+.application-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
+.btn-round-action {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    background: var(--bg-input);
+}
+
+.btn-action-accept {
+    color: #4ade80;
+    border-color: rgba(74, 222, 128, 0.3);
+    background: rgba(74, 222, 128, 0.08);
+}
+.btn-action-accept:hover {
+    background: #22c55e;
+    color: #fff;
+    border-color: #22c55e;
+    box-shadow: 0 0 12px rgba(34, 197, 94, 0.45);
+    transform: scale(1.08);
+}
+
+.btn-action-reject {
+    color: #f87171;
+    border-color: rgba(248, 113, 113, 0.3);
+    background: rgba(248, 113, 113, 0.08);
+}
+.btn-action-reject:hover {
+    background: #ef4444;
+    color: #fff;
+    border-color: #ef4444;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.45);
+    transform: scale(1.08);
+}
+
+.btn-action-imposter {
+    color: #fbbf24;
+    border-color: rgba(251, 191, 36, 0.3);
+    background: rgba(251, 191, 36, 0.08);
+}
+.btn-action-imposter:hover {
+    background: #d97706;
+    color: #fff;
+    border-color: #d97706;
+    box-shadow: 0 0 12px rgba(217, 119, 6, 0.45);
+    transform: scale(1.08);
 }
 
 .houses-grid {
@@ -390,6 +539,12 @@ body {
 .btn-secondary:hover {
     border-color: var(--gold);
     color: var(--gold);
+}
+
+.btn-secondary.btn-danger:hover {
+    border-color: var(--danger);
+    color: #ff6b6b;
+    background: rgba(184, 50, 50, 0.12);
 }
 
 .auth-wrapper {

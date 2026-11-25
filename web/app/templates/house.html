@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}My House — The Great Books{% endblock %}
+
+{% block content %}
+<section id="page-house" class="page">
+    <div class="page-header" style="align-items: flex-start;">
+        <div>
+            <h1 id="house-name">Loading House...</h1>
+            <p id="house-motto" class="subtitle">Loading house motto...</p>
+        </div>
+        <div class="house-actions" style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
+            <button id="btn-change-house" class="btn-secondary" onclick="openEditHouseModal()">Edit House info</button>
+            <button id="btn-leave-house" class="btn-secondary btn-danger" onclick="openLeaveHouseModal()">Leave House</button>
+        </div>
+    </div>
+
+    <div class="auth-tabs" style="margin-bottom: 1.5rem; border-radius: 8px 8px 0 0; overflow: hidden; background: var(--bg-input);">
+        <button id="tab-btn-members" class="tab-btn active" onclick="switchHouseTab('members')">
+            Members <span id="members-count" class="role-badge" style="font-size: 0.75rem; margin-left: 0.4rem;">0</span>
+        </button>
+        <button id="tab-btn-applications" class="tab-btn" onclick="switchHouseTab('applications')">
+            Applications <span id="applications-count" class="role-badge" style="font-size: 0.75rem; margin-left: 0.4rem;">0</span>
+        </button>
+    </div>
+
+
+    <div id="tab-members" class="tab-content">
+        <div id="house-members-list" class="cards-grid">
+
+        </div>
+        <p id="no-members-msg" class="text-muted hidden" style="text-align: center; padding: 2rem;">No members found in this house.</p>
+    </div>
+
+
+    <div id="tab-applications" class="tab-content hidden">
+        <div id="house-applications-list" class="applications-list">
+
+        </div>
+        <p id="no-applications-msg" class="text-muted hidden" style="text-align: center; padding: 2rem;">No pending applications.</p>
+    </div>
+</section>
+
+<div id="edit-house-modal" class="modal-backdrop hidden" onclick="handleModalBackdropClick(event)">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>Edit House</h3>
+            <button type="button" class="modal-close" onclick="closeEditHouseModal()">&times;</button>
+        </div>
+        <form id="edit-house-form" class="auth-form" onsubmit="saveHouseChanges(event)">
+            <label>
+                House name
+                <input type="text" id="edit-name" minlength="5" maxlength="20" required>
+            </label>
+            <label>
+                House motto
+                <input type="text" id="edit-motto" minlength="5" maxlength="30" required>
+            </label>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeEditHouseModal()">Cancel</button>
+                <button type="submit" id="btn-save-house" class="btn-primary" style="margin-top: 0;">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+<div id="leave-house-modal" class="modal-backdrop hidden" onclick="handleLeaveModalBackdropClick(event)">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 style="color: var(--danger, #ff6b6b);">Renounce Allegiance</h3>
+            <button type="button" class="modal-close" onclick="closeLeaveHouseModal()">&times;</button>
+        </div>
+        <div class="auth-form">
+            <p style="color: var(--text-main); font-size: 1rem; line-height: 1.5;">
+                Are you sure you want to leave <b id="leave-house-target-name">your House</b>?
+            </p>
+            <p class="text-muted" style="font-size: 0.85rem; margin-top: -0.5rem;">
+                You will lose all house privileges and become a free agent in the Realm.
+            </p>
+            <div class="modal-actions" style="margin-top: 1rem;">
+                <button type="button" class="btn-secondary" onclick="closeLeaveHouseModal()">Cancel</button>
+                <button type="button" id="btn-confirm-leave" class="btn-secondary btn-danger" style="margin-top: 0;" onclick="confirmLeaveHouse()">Yes, Leave House</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ban (Night's Watch) Modal -->
+<div id="ban-modal" class="modal-backdrop hidden" onclick="handleBanModalBackdropClick(event)">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 style="color: #64b5f6;">Send to Night's Watch</h3>
+            <button type="button" class="modal-close" onclick="closeBanModal()">&times;</button>
+        </div>
+        <div class="auth-form">
+            <p style="color: var(--text-main); font-size: 1rem; line-height: 1.5;">
+                Send <b id="ban-target-name">this member</b> to the Wall forever?
+            </p>
+            <p class="text-muted" style="font-size: 0.85rem; margin-top: -0.5rem;">
+                They will take the Black, be stripped of all titles and lands, and banished to the Night's Watch.
+            </p>
+            <div class="modal-actions" style="margin-top: 1rem;">
+                <button type="button" class="btn-secondary" onclick="closeBanModal()">Cancel</button>
+                <button type="button" id="btn-confirm-ban" class="btn-ban" style="margin-top: 0; width: auto; padding: 0.55rem 1.2rem;" onclick="confirmBanMember()">⚔️ Send to Wall</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Kick (Cast Out) Modal -->
+<div id="kick-modal" class="modal-backdrop hidden" onclick="handleKickModalBackdropClick(event)">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 style="color: var(--danger, #ff6b6b);">Cast Out of House</h3>
+            <button type="button" class="modal-close" onclick="closeKickModal()">&times;</button>
+        </div>
+        <div class="auth-form">
+            <p style="color: var(--text-main); font-size: 1rem; line-height: 1.5;">
+                Expel <b id="kick-target-name">this member</b> from the family?
+            </p>
+            <p class="text-muted" style="font-size: 0.85rem; margin-top: -0.5rem;">
+                They will lose allegiance to your house and become unsworn commoners/free knights.
+            </p>
+            <div class="modal-actions" style="margin-top: 1rem;">
+                <button type="button" class="btn-secondary" onclick="closeKickModal()">Cancel</button>
+                <button type="button" id="btn-confirm-kick" class="btn-kick" style="margin-top: 0; width: auto; padding: 0.55rem 1.2rem;" onclick="confirmKickMember()">💨 Cast Out</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='house.js') }}"></script>
+{% endblock %}

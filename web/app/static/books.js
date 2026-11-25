@@ -138,20 +138,6 @@ function renderCharacterCard(person, bookRole) {
     }
 
     const targetRole = person.role ? person.role.toLowerCase() : "";
-    const isLordOfSameHouse = (
-        currentUser &&
-        currentUser.role &&
-        currentUser.role.toLowerCase() === "noble" &&
-        currentUser.house_id &&
-        currentUser.house_id === person.house_id &&
-        person.id !== currentUser.id &&
-        (targetRole === "knight" || targetRole === "noble")
-    );
-
-    let banBtnHtml = "";
-    if (isLordOfSameHouse) {
-        banBtnHtml = '<button type="button" class="btn-ban" onclick="sendToNightsWatch(' + person.id + ', \'' + person.username.replace(/'/g, "\\'") + '\')">⚔️ Send to Night\'s Watch</button>';
-    }
 
     return (
         '<div class="knight-card">' +
@@ -163,7 +149,6 @@ function renderCharacterCard(person, bookRole) {
         '<div class="card-house">' + houseLabel + '</div>' +
         '<div class="card-motto">"' + motto + '"</div>' +
         '<div class="card-name">' + person.username + '</div>' +
-        banBtnHtml +
         statsSectionHtml +
         '</div>' +
         '</div>'
@@ -196,19 +181,6 @@ async function submitGossip(targetId) {
     }
 }
 
-async function sendToNightsWatch(targetId, username) {
-    if (!confirm("Banish " + username + " to the Night's Watch forever?")) return;
-
-    try {
-        const res = await apiFetch("/nightwatch/" + targetId, {
-            method: "POST"
-        });
-        showAlert(res.message || (username + " has been sent to the Night's Watch."));
-        await loadRealmRoster();
-    } catch (err) {
-        showAlert(err.message, true);
-    }
-}
 
 document.addEventListener("DOMContentLoaded", async () => {
     if (window.coreInitPromise) await window.coreInitPromise;

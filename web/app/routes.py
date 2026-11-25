@@ -64,6 +64,10 @@ def login():
 def profile():
     return render_template("profile.html")
 
+@web_ui.route("/house")
+def house():
+    return render_template("house.html")
+
 @web_ui.route("/nightwatch")
 def nightwatch():
     return render_template("nightwatch.html")
@@ -419,6 +423,54 @@ def get_house_members(current_user, house_id):
     return jsonify(result), 200
 
 
+@api.route("/houses/<int:house_id>", methods=["GET"])
+@login_required
+def get_house(current_user, house_id):
+    house = House.query.get(house_id)
+    if not house:
+        return jsonify({"error": "House not found"}), 404
+    return jsonify({
+        "id": house.id,
+        "name": house.name,
+        "motto": house.motto,
+    }), 200
+
+
+@api.route("/house", methods=["GET"])
+@login_required
+def get_my_house(current_user):
+    if not current_user.house_id:
+        return jsonify({"error": "You are not sworn to any house"}), 404
+    house = House.query.get(current_user.house_id)
+    if not house:
+        return jsonify({"error": "House not found"}), 404
+    return jsonify({
+        "id": house.id,
+        "name": house.name,
+        "motto": house.motto,
+    }), 200
+
+
+@api.route("/house/leave", methods=["POST"])
+@login_required
+def leave_house(current_user):
+    if not current_user.house_id:
+        return jsonify({"error": "You are not sworn to any house"}), 400
+
+    current_user.house_id = None
+    current_user.is_white_knight = False
+    db.session.commit()
+
+    return jsonify({
+        "message": "You have renounced your allegiance and left the house successfully.",
+        "user": {
+            "id": current_user.id,
+            "username": current_user.username,
+            "house_id": None
+        }
+    }), 200
+
+
 @api.route("/houses/<int:house_id>", methods=["PUT", "PATCH"])
 @login_required
 def update_house(current_user, house_id):
@@ -627,6 +679,31 @@ def ban_with_nightwatch(current_user, target_id):
         return jsonify({
             "message": "Commonfolk was banned"
         }), 200
+
+
+@api.route("/houses/<int:house_id>/kick/<int:target_id>", methods=["POST"])
+@login_required
+def kick_from_house(current_user, house_id, target_id):
+    if not current_user.role or current_user.role.role_name.lower() != "noble":
+        return jsonify({"error": "Only lords can kick members from a house"}), 403
+
+    if current_user.house_id != house_id:
+        return jsonify({"error": "Access denied. You can only manage your own house"}), 403
+
+    if current_user.id == target_id:
+        return jsonify({"error": "You cannot kick yourself from your own house"}), 400
+
+    target = User.query.get(target_id)
+    if not target or target.house_id != house_id:
+        return jsonify({"error": "Member not found in this house"}), 404
+
+    target.house_id = None
+    target.is_white_knight = False
+    db.session.commit()
+
+    return jsonify({
+        "message": f"{target.username} was cast out of House."
+    }), 200
         
         
 def is_banished_ip():    

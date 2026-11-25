@@ -113,12 +113,15 @@ async function checkAuth() {
 
 function updateNavUI(user) {
     const isLoggedIn = Boolean(user);
+    const hasHouse = isLoggedIn && user.house_id !== null;
     const navProfile = document.getElementById("nav-profile");
     if (navProfile) navProfile.classList.toggle("hidden", !isLoggedIn);
     const navLogout = document.getElementById("nav-logout");
     if (navLogout) navLogout.classList.toggle("hidden", !isLoggedIn);
     const navAuth = document.getElementById("nav-auth");
     if (navAuth) navAuth.classList.toggle("hidden", isLoggedIn);
+    const navHouse = document.getElementById("nav-house");
+    if (navHouse) navHouse.classList.toggle("hidden", !hasHouse);
 
     let badgeText = "Guest (Spectator)";
     if (user) {

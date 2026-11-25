@@ -16,7 +16,7 @@
         <nav class="nav-links">
             <a class="nav-btn {{ 'active' if request.path == '/knights' else '' }}" id="nav-knights" href="/knights">Book of Knights</a>
             <a class="nav-btn {{ 'active' if request.path == '/lords' else '' }}" id="nav-lords" href="/lords">Book of Lords</a>
-            <a class="nav-btn {{ 'active' if request.path in ['/', '/houses'] else '' }}" id="nav-houses" href="/">Great Houses</a>
+            <a class="nav-btn {{ 'active' if request.path == '/house' else '' }}" id="nav-house" href="/house">Your House</a>
             <a class="nav-btn hidden {{ 'active' if request.path == '/profile' else '' }}" id="nav-profile" href="/profile">My Profile</a>
             <a class="nav-btn {{ 'active' if request.path == '/login' else '' }}" id="nav-auth" href="/login">Login / Register</a>
             <button class="nav-btn btn-danger hidden" id="nav-logout" onclick="logout()">Logout</button>
