@@ -1,4 +1,4 @@
-name: Linting Python, JavaScript, Ansible, Packer, and Shell scripts
+name: Linting Python, Ansible, Packer and Shell scripts
 
 run-name: ${{ github.workflow.name }} - ${{ github.actor }}
 
@@ -8,14 +8,13 @@ on:
 
 env:
   python-version: 3.10.12
+  ruff-version: 0.17.6
 
 jobs:
   linting:
     name: Source Code linting
     runs-on: ubuntu-22.04
-    # defaults:
-    #   run:
-    #     working-directory: ./src
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,7 +27,24 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-        #  pip install flake8 pylint black isort yamllint ansible-lint packer-linter shellcheck
-          pip install ruff
-          
-    
+          pip install ruff-${{ env.ruff-version }}
+        # pip install flake8 pylint black isort yamllint ansible-lint packer-linter shellcheck
+
+      - name: Lint Python code
+        run: |
+          ruff check
+        working-directory: web
+
+
+    #   - name: Lint Packer code
+    #     run: |
+    #       apt install -y packer
+    #       packer validate
+    #     working-directory: infrastructure/packer
+
+        
+    #   - name: Lint Ansible code
+    #     run: |
+    #       apt install -y ansible-lint
+    #       ansible-lint
+    #     working-directory: infrastructure/ansible
