@@ -3,6 +3,8 @@ name: Linting Python, Ansible, Packer and Shell scripts
 run-name: ${{ github.workflow.name }} - ${{ github.actor }}
 
 on: 
+  push:
+    branches: ["main"]
   pull_request:
     branches: ["main"]
 
