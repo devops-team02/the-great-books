@@ -1,6 +1,6 @@
 name: Linting Python, Ansible, Packer and Shell scripts
 
-run-name: ${{ github.pull_request.title }} - ${{ github.actor }}
+run-name: ${{ github.event_name }} - ${{ github.ref_name }} by ${{ github.actor }}
 
 on: 
   push:
@@ -29,7 +29,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install ruff-${{ env.ruff-version }}
+          pip install ruff==${{ env.ruff-version }}
         # pip install flake8 pylint black isort yamllint ansible-lint packer-linter shellcheck
 
     #   - name: Lint Python code
