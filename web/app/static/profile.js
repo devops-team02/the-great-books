@@ -17,7 +17,10 @@ async function loadProfile() {
         const houseName = houseObj ? houseObj.name : null;
 
         const profBanner = document.getElementById("prof-banner");
-        if (profBanner) profBanner.className = "profile-banner " + getHouseBannerClass(houseName);
+        if (profBanner) {
+            profBanner.className = "profile-banner";
+            profBanner.style.cssText = getHouseBannerStyle(me.house_id);
+        }
 
         const profMonogram = document.getElementById("prof-monogram");
         if (profMonogram) {

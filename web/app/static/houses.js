@@ -28,14 +28,14 @@ function renderHousesPage() {
     if (countEl) countEl.textContent = housesList.length + " Great Houses";
 
     grid.innerHTML = housesList.map(h => {
-        const bannerClass = getHouseBannerClass(h.name);
+        const bannerStyle = getHouseBannerStyle(h.id);
         const motto = getHouseMotto(h);
         const isMyHouse = currentUser && currentUser.house_id === h.id;
         const editable = canEditHouse(h);
 
         return (
             '<div class="house-card">' +
-            '<div class="house-banner ' + bannerClass + '">House ' + h.name + '</div>' +
+            '<div class="house-banner" style="' + bannerStyle + '">House ' + h.name + '</div>' +
             '<div class="house-card-body">' +
             '<div class="card-motto">"' + motto + '"</div>' +
             (isMyHouse ? '<span class="role-badge">Your Allegiance</span>' : '') +

@@ -89,7 +89,7 @@ function renderCharacterCard(person, bookRole) {
     const motto = houseName && HOUSE_MOTTOS[houseName]
         ? HOUSE_MOTTOS[houseName]
         : (bookRole === "noble" ? "By Right of Blood" : "Sword for Hire");
-    const bannerClass = getHouseBannerClass(houseName);
+    const bannerStyle = getHouseBannerStyle(person.house_id);
     const initials = getInitials(person.username);
 
     const avatarHtml = person.photo_url
@@ -141,7 +141,7 @@ function renderCharacterCard(person, bookRole) {
 
     return (
         '<div class="knight-card">' +
-        '<div class="card-crest-bg ' + bannerClass + '">' +
+        '<div class="card-crest-bg" style="' + bannerStyle + '">' +
         avatarHtml +
         '<span class="card-role-tag">' + (person.is_white_knight ? "white knight" : person.role) + '</span>' +
         '</div>' +

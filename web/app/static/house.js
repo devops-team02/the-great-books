@@ -42,7 +42,7 @@ async function loadHouse() {
 function createMemberCard(member, house) {
     const isKnight = member.role && member.role.toLowerCase() === "knight";
     const isNoble = member.role && member.role.toLowerCase() === "noble";
-    const bannerClass = getHouseBannerClass(house ? house.name : "");
+    const bannerStyle = getHouseBannerStyle(house ? house.id : null);
     const initials = getInitials(member.username);
 
     const avatarHtml = member.photo_url
@@ -73,7 +73,7 @@ function createMemberCard(member, house) {
     const card = document.createElement("div");
     card.className = "knight-card";
     card.innerHTML = `
-        <div class="card-crest-bg ${bannerClass}">
+        <div class="card-crest-bg" style="${bannerStyle}">
             ${avatarHtml}
             <span class="card-role-tag">${member.role || "Member"}</span>
         </div>
