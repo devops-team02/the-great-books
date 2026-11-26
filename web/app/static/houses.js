@@ -27,10 +27,22 @@ function renderHousesPage() {
     const countEl = document.getElementById("houses-count");
     if (countEl) countEl.textContent = housesList.length + " Great Houses";
 
+    const role = (currentUser?.role || "").toLowerCase();
+    const canRequest = currentUser && role !== "commonfolk" && !currentUser.house_id && !currentUser.is_white_knight;
+
     grid.innerHTML = housesList.map(h => {
         const bannerStyle = getHouseBannerStyle(h.id);
-        const motto = getHouseMotto(h);
+        const motto = getHouseMotto(h.motto);
         const isMyHouse = currentUser && currentUser.house_id === h.id;
+        
+        let requestBtnHtml = "";
+        if (canRequest) {
+            if (currentUser.pending_request_house_id === h.id) {
+                requestBtnHtml = `<button type="button" class="btn-secondary" disabled style="margin-top: 0.75rem; width: 100%; opacity: 0.7;">Request Pending</button>`;
+            } else if (!currentUser.pending_request_house_id) {
+                requestBtnHtml = `<button type="button" class="btn-primary" style="margin-top: 0.75rem; width: 100%;" onclick="sendJoinRequest(${h.id})">Send join request</button>`;
+            }
+        }
         const editable = canEditHouse(h);
 
         return (
@@ -42,6 +54,7 @@ function renderHousesPage() {
             (editable
                 ? '<button class="btn-primary" style="padding: 0.5rem; font-size: 0.9rem;" onclick="openEditHouseForm(' + h.id + ')">✏️ Edit House Info</button>'
                 : '') +
+            requestBtnHtml +
             '<div style="display:flex; gap:0.5rem; margin-top:auto;">' +
             '<button class="btn-secondary" style="flex:1" onclick="filterHouseInBook(\'knights\', ' + h.id + ')">Knights</button>' +
             '<button class="btn-secondary" style="flex:1" onclick="filterHouseInBook(\'lords\', ' + h.id + ')">Lords</button>' +
@@ -51,6 +64,7 @@ function renderHousesPage() {
         );
     }).join("");
 }
+
 
 function openEditHouseForm(houseId) {
     const house = housesMap[houseId];
@@ -106,6 +120,23 @@ async function handleEditHouse(e) {
 
 function filterHouseInBook(bookPage, houseId) {
     window.location.href = "/" + bookPage + "?house=" + houseId;
+}
+
+async function sendJoinRequest(houseId) {
+    try {
+        const res = await apiFetch(`/houses/${houseId}/request`, {
+            method: "POST"
+        });
+        showAlert(res.message || "Join request sent!");
+        currentUser = await apiFetch("/me");
+        if (typeof loadHouses === "function") {
+            await loadHouses();
+        } else {
+            window.location.reload();
+        }
+    } catch (err) {
+        showAlert(err.message, true);
+    }
 }
 
 document.addEventListener("DOMContentLoaded", async () => {

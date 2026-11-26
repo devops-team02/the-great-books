@@ -2,7 +2,7 @@ async function submitKnightSetup(e) {
     e.preventDefault();
 
     const isWhite = document.getElementById("reg-white-knight").checked;
-    const houseId = document.getElementById("reg-house").value;
+    // const houseId = document.getElementById("reg-house").value;
     const strength = document.getElementById("knight-str").value;
     const defense = document.getElementById("knight-def").value;
     const endurance = document.getElementById("knight-end").value;
@@ -14,7 +14,7 @@ async function submitKnightSetup(e) {
 
     const formData = new FormData();
     formData.append("is_white_knight", isWhite ? "true" : "false");
-    formData.append("house_id", houseId);
+    formData.append("house_id", null);
     formData.append("strength", strength);
     formData.append("defense", defense);
     formData.append("endurance", endurance);
@@ -50,7 +50,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
     }
 
-    const select = document.getElementById("reg-house");
-    select.innerHTML = '<option value="">Choose a Great House...</option>' +
-        housesList.map(h => `<option value="${h.id}">House ${h.name}</option>`).join("");
+    if(select) {
+        const select = document.getElementById("reg-house");
+        select.innerHTML = '<option value="">Choose a Great House...</option>' +
+            housesList.map(h => `<option value="${h.id}">House ${h.name}</option>`).join("");
+    }
 });

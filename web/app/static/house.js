@@ -32,7 +32,7 @@ async function loadHouse() {
             });
         }
 
-        renderMockApplications();
+        await loadApplications(house.id);
     } catch (error) {
         console.error("Error loading house data:", error);
         showAlert(error.message || "Failed to load house data", "danger");
@@ -290,55 +290,52 @@ function handleModalBackdropClick(e) {
     }
 }
 
-let mockApplications = [
-    {
-        id: 101,
-        username: "Ser Brienne of Tarth",
-        role: "Knight",
-        photo_url: null,
-        stats: { strength: 18, defense: 17, endurance: 19 }
-    },
-    {
-        id: 102,
-        username: "Davos Seaworth",
-        role: "Commoner",
-        photo_url: null,
-        stats: null
-    },
-    {
-        id: 103,
-        username: "Sandor Clegane",
-        role: "Knight",
-        photo_url: null,
-        stats: { strength: 19, defense: 15, endurance: 16 }
-    }
-];
+let houseApplications = [];
 
-function renderMockApplications() {
+async function loadApplications(houseId) {
+    const tabBtn = document.getElementById("tab-btn-applications");
     const listEl = document.getElementById("house-applications-list");
     const countBadge = document.getElementById("applications-count");
     const emptyMsg = document.getElementById("no-applications-msg");
-    if (!listEl) return;
 
-    listEl.innerHTML = "";
-    if (countBadge) countBadge.textContent = mockApplications.length;
-
-    if (mockApplications.length === 0) {
-        if (emptyMsg) emptyMsg.classList.remove("hidden");
+    const isNoble = currentUser && currentUser.role && currentUser.role.toLowerCase() === "noble";
+    if (!isNoble) {
+        if (tabBtn) tabBtn.classList.add("hidden");
         return;
     }
 
-    if (emptyMsg) emptyMsg.classList.add("hidden");
+    if (tabBtn) tabBtn.classList.remove("hidden");
+    if (!listEl) return;
 
-    mockApplications.forEach(app => {
-        const item = createApplicationItem(app);
-        listEl.appendChild(item);
-    });
+    try {
+        houseApplications = await apiFetch(`/houses/${houseId}/requests`);
+        listEl.innerHTML = "";
+        if (countBadge) countBadge.textContent = houseApplications.length;
+
+        if (houseApplications.length === 0) {
+            if (emptyMsg) emptyMsg.classList.remove("hidden");
+            return;
+        }
+
+        if (emptyMsg) emptyMsg.classList.add("hidden");
+
+        houseApplications.forEach(app => {
+            const item = createApplicationItem(app);
+            listEl.appendChild(item);
+        });
+    } catch (err) {
+        console.error("Error loading applications:", err);
+        showAlert(err.message || "Failed to load applications", true);
+    }
 }
 
 function createApplicationItem(app) {
     const isKnight = app.role && app.role.toLowerCase() === "knight";
     const initials = getInitials(app.username);
+
+    const avatarHtml = app.photo_url
+        ? `<img src="/static/pictures/${app.photo_url}" alt="${app.username}" class="crest-monogram" style="width: 48px; height: 48px; object-fit: cover; padding: 0; flex-shrink: 0;" onerror="this.outerHTML='<div class=\\'crest-monogram\\' style=\\'width: 48px; height: 48px; font-size: 1.1rem; flex-shrink: 0;\\'>${initials}</div>'">`
+        : `<div class="crest-monogram" style="width: 48px; height: 48px; font-size: 1.1rem; flex-shrink: 0;">${initials}</div>`;
 
     let statsHtml = "";
     if (isKnight && app.stats) {
@@ -356,9 +353,7 @@ function createApplicationItem(app) {
     card.id = `application-item-${app.id}`;
     card.innerHTML = `
         <div class="application-info">
-            <div class="crest-monogram" style="width: 48px; height: 48px; font-size: 1.1rem; flex-shrink: 0;">
-                ${initials}
-            </div>
+            ${avatarHtml}
             <div class="application-details">
                 <div class="application-name-row">
                     <span class="application-name">${app.username}</span>
@@ -383,20 +378,28 @@ function createApplicationItem(app) {
     return card;
 }
 
-function handleApplicationAction(appId, action) {
-    const app = mockApplications.find(a => a.id === appId);
+async function handleApplicationAction(appId, action) {
+    const app = houseApplications.find(a => a.id === appId);
     const name = app ? app.username : "Applicant";
 
-    if (action === "accept") {
-        showAlert(`Accepted ${name} into the House!`, false);
-    } else if (action === "reject") {
-        showAlert(`Rejected application from ${name}.`, true);
-    } else if (action === "imposter") {
-        showAlert(`Declared ${name} as a treacherous imposter!`, true);
-    }
+    try {
+        const res = await apiFetch(`/requests/${appId}/${action}`, {
+            method: "POST"
+        });
 
-    mockApplications = mockApplications.filter(a => a.id !== appId);
-    renderMockApplications();
+        if (action === "accept") {
+            showAlert(res.message || `Accepted ${name} into the House!`, false);
+            await loadHouse();
+        } else if (action === "reject") {
+            showAlert(res.message || `Rejected application from ${name}.`, true);
+            if (currentHouse) await loadApplications(currentHouse.id);
+        } else if (action === "imposter") {
+            showAlert(res.message || `Declared ${name} as a treacherous imposter!`, true);
+            if (currentHouse) await loadApplications(currentHouse.id);
+        }
+    } catch (err) {
+        showAlert(err.message, true);
+    }
 }
 
 document.addEventListener("DOMContentLoaded", async () => {

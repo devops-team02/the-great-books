@@ -8,7 +8,7 @@ from flask import Blueprint, request, jsonify, render_template, redirect, url_fo
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from .extensions import db
-from .models import User, Role, House, Stat, Session
+from .models import User, Role, House, Stat, Session, Requests
 
 web_ui = Blueprint("web_ui", __name__, url_prefix="/")
 photo_path = "./app/static/pictures/"  #path for uploaded photos
@@ -32,6 +32,8 @@ def require_auth():
         resp.delete_cookie("token", path="/")
         return resp
             
+    check_expired_requests()
+    
     session_obj = Session.query.filter_by(id=token).first()   
     
     if not session_obj or session_obj.expires_at <= datetime.utcnow():
@@ -136,6 +138,7 @@ def get_houses():
             "id": h.id,
             "name": h.name,
             "motto": h.motto,
+            
         })
     return jsonify(result), 200
 
@@ -217,6 +220,8 @@ def login():
     user = User.query.filter_by(username=username).first()
     if not user or not check_password_hash(user.password, password):
         return jsonify({"error": "Invalid credentials"}), 401
+    
+    check_expired_requests()
 
     token = secrets.token_hex(32)
     ip_now = get_client_ip()
@@ -272,12 +277,15 @@ def logout(current_user):
 def get_me(current_user):
     role_name = current_user.role.role_name.lower() if current_user.role else ""
     is_knight = role_name == "knight"
+    active_req = Requests.query.filter_by(user_id=current_user.id).first()
     
     return jsonify({
         "id": current_user.id,
         "username": current_user.username,
         "role": current_user.role.role_name,
         "house_id": current_user.house_id,
+        "pending_request_house_id": active_req.house_id if active_req else None,
+        "photo_url": current_user.photo_url,
         "photo_url": current_user.photo_url,
         "is_white_knight": current_user.is_white_knight,
         "stats": {
@@ -288,6 +296,7 @@ def get_me(current_user):
         "gossip_key": current_user.stats.key if (is_knight and current_user.stats) else None,
         "next_key": current_user.stats.next_key.isoformat() if (is_knight and current_user.stats and current_user.stats.next_key) else None,
         "gossip_target_id": current_user.stats.gossip_target_id if (is_knight and current_user.stats) else None,
+        "pending_request_house_id": active_req.house_id if active_req else None,
     }), 200
 
 
@@ -309,6 +318,9 @@ def update_me(current_user):
         current_user.username = new_username
 
     if "house_id" in data:
+        if not current_user.role or current_user.role.role_name.lower() != "noble":
+            return jsonify({"error": "Only Nobles can choose or change their Sworn House"}), 403
+
         raw_house = data.get("house_id")
         if raw_house is None or str(raw_house).strip() == "":
             current_user.house_id = None
@@ -322,6 +334,7 @@ def update_me(current_user):
                 return jsonify({"error": "Invalid house_id"}), 400
             current_user.house_id = house.id
             current_user.is_white_knight = False
+
 
     photo_file = request.files.get("photo") if is_multipart else None
     if photo_file and photo_file.filename:
@@ -783,7 +796,7 @@ def setup_knight(current_user):
         return jsonify({"error": "Only knights can access this"}), 403
 
     is_white_knight = request.form.get("is_white_knight") == "true"
-    house_raw = (request.form.get("house_id") or "").strip()
+    # house_raw = (request.form.get("house_id") or "").strip()
     photo = request.files.get("photo")
 
     try:
@@ -803,16 +816,8 @@ def setup_knight(current_user):
 
     current_user.photo_url = photo_url
     current_user.is_white_knight = is_white_knight
-
-    if is_white_knight:
-        current_user.house_id = None
-    elif house_raw:
-        house = House.query.get(int(house_raw))
-        if not house:
-            return jsonify({"error": "House not found"}), 404
-        current_user.house_id = house.id
-    else:
-        return jsonify({"error": "Great House is required for sworn knights"}), 400
+    
+    current_user.house_id = None
 
     if not current_user.stats:
         current_user.stats = Stat(user_id=current_user.id)
@@ -823,3 +828,135 @@ def setup_knight(current_user):
 
     db.session.commit()
     return jsonify({"message": "Knight profile saved"}), 200
+
+def check_expired_requests():
+    expired = Requests.query.filter(Requests.expires_at <= datetime.utcnow())
+    if(not expired):
+        return
+    for req in expired:
+        user = User.query.get(req.user_id)
+        if user and user.role and user.role.role_name.lower() == "knight":
+            user.nightwatch = True
+            user.house_id = None
+        db.session.delete(req)
+    db.session.commit()
+    
+@api.route("/houses/<int:house_id>/request", methods=["POST"])
+@login_required
+def create_join_request(current_user, house_id):
+    check_expired_requests()
+
+    role_name = current_user.role.role_name.lower() if current_user.role else ""
+    if role_name == "commonfolk":
+        return jsonify({"error": "Commonfolk cannot send join requests"}), 403
+
+    if current_user.house_id is not None:
+        return jsonify({"error": "You are already sworn to a house"}), 400
+
+    if current_user.is_white_knight:
+        return jsonify({"error": "White Knights cannot join a Great House"}), 400
+
+    house = House.query.get(house_id)
+    if not house:
+        return jsonify({"error": "House not found"}), 404
+
+    existing = Requests.query.filter_by(user_id=current_user.id).first()
+    if existing:
+        return jsonify({"error": "You already have an active join request"}), 409
+
+    new_req = Requests(
+        user_id=current_user.id,
+        house_id=house_id,
+        expires_at=datetime.utcnow() + timedelta(hours=24)
+    )
+    db.session.add(new_req)
+    db.session.commit()
+
+    return jsonify({"message": f"Join request sent to House {house.name}"}), 201
+
+
+@api.route("/houses/<int:house_id>/requests", methods=["GET"])
+@login_required
+def get_house_requests(current_user, house_id):
+    check_expired_requests()
+
+    role_name = current_user.role.role_name.lower() if current_user.role else ""
+    if current_user.house_id != house_id or role_name != "noble":
+        return jsonify({"error": "Access denied"}), 403
+
+    reqs = Requests.query.filter_by(house_id=house_id).all()
+    result = []
+    for r in reqs:
+        result.append({
+            "id": r.id,
+            "user_id": r.user.id,
+            "username": r.user.username,
+            "role": r.user.role.role_name if r.user.role else "",
+            "photo_url": r.user.photo_url,
+            "expires_at": r.expires_at.isoformat(),
+            "stats": {
+                "strength": r.user.stats.strength,
+                "defense": r.user.stats.defense,
+                "endurance": r.user.stats.endurance,
+            } if r.user.stats else None,
+        })
+    return jsonify(result), 200
+
+
+@api.route("/requests/<int:req_id>/accept", methods=["POST"])
+@login_required
+def accept_join_request(current_user, req_id):
+    check_expired_requests()
+
+    req = Requests.query.get(req_id)
+    if not req:
+        return jsonify({"error": "Request not found or expired"}), 404
+
+    role_name = current_user.role.role_name.lower() if current_user.role else ""
+    if role_name != "noble" or current_user.house_id != req.house_id:
+        return jsonify({"error": "Access denied"}), 403
+
+    req.user.house_id = req.house_id
+    req.user.is_white_knight = False
+    db.session.delete(req)
+    db.session.commit()
+
+    return jsonify({"message": f"{req.user.username} accepted into the house"}), 200
+
+
+@api.route("/requests/<int:req_id>/reject", methods=["POST"])
+@login_required
+def reject_join_request(current_user, req_id):
+    req = Requests.query.get(req_id)
+    if not req:
+        return jsonify({"error": "Request not found"}), 404
+
+    role_name = current_user.role.role_name.lower() if current_user.role else ""
+    if role_name != "noble" or current_user.house_id != req.house_id:
+        return jsonify({"error": "Access denied"}), 403
+
+    username = req.user.username
+    db.session.delete(req)
+    db.session.commit()
+
+    return jsonify({"message": f"Request from {username} rejected"}), 200
+
+
+@api.route("/requests/<int:req_id>/imposter", methods=["POST"])
+@login_required
+def mark_request_imposter(current_user, req_id):
+    req = Requests.query.get(req_id)
+    if not req:
+        return jsonify({"error": "Request not found"}), 404
+
+    role_name = current_user.role.role_name.lower() if current_user.role else ""
+    if role_name != "noble" or current_user.house_id != req.house_id:
+        return jsonify({"error": "Access denied"}), 403
+
+    username = req.user.username
+    req.user.nightwatch = True
+    req.user.house_id = None
+    db.session.delete(req)
+    db.session.commit()
+
+    return jsonify({"message": f"{username} marked as imposter and banished to the Night's Watch"}), 200

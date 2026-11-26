@@ -71,3 +71,14 @@ class Session(db.Model):
     expires_at = db.Column(db.DateTime, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     ip_address = db.Column(db.String(45))
+    
+class Requests(db.Model):
+    __tablename__ = "requests"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    house_id = db.Column(db.Integer, db.ForeignKey("houses.id"), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+
+    user = db.relationship("User", backref="join_requests")
+    house = db.relationship("House", backref="join_requests")

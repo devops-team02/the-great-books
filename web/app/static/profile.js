@@ -1,5 +1,6 @@
 let editSelectedPhotoFile = null;
 let editRemoveExistingPhoto = false;
+const DEFAULT_IMG = "/static/assets/image.png";
 
 async function loadProfile() {
     const profUsername = document.getElementById("prof-username");
@@ -176,8 +177,14 @@ function processEditSelectedPhoto(file) {
 
         if (previewImg) previewImg.src = ev.target.result;
         if (fileNameEl) fileNameEl.textContent = file.name;
-        if (placeholder) placeholder.classList.add("hidden");
-        if (previewWrap) previewWrap.classList.remove("hidden");
+        if (placeholder) {
+            placeholder.classList.add("hidden");
+            placeholder.style.display = "none";
+        }
+        if (previewWrap) {
+            previewWrap.classList.remove("hidden");
+            previewWrap.style.display = "flex";
+        }
     };
     reader.readAsDataURL(file);
 }
@@ -194,10 +201,16 @@ function clearEditSelectedPhoto(e) {
     const previewWrap = document.getElementById("edit-photo-preview-wrap");
 
     if (input) input.value = "";
-    if (previewImg) previewImg.src = "";
-    if (fileNameEl) fileNameEl.textContent = "";
-    if (previewWrap) previewWrap.classList.add("hidden");
-    if (placeholder) placeholder.classList.remove("hidden");
+    if (previewImg) previewImg.src = DEFAULT_IMG;
+    if (fileNameEl) fileNameEl.textContent = "Default portrait";
+    if (placeholder) {
+        placeholder.classList.add("hidden");
+        placeholder.style.display = "none";
+    }
+    if (previewWrap) {
+        previewWrap.classList.remove("hidden");
+        previewWrap.style.display = "flex";
+    }
 }
 
 function openEditProfileModal() {
@@ -215,6 +228,14 @@ function openEditProfileModal() {
     const fileNameEl = document.getElementById("edit-photo-file-name");
     const placeholder = document.getElementById("edit-photo-placeholder");
     const previewWrap = document.getElementById("edit-photo-preview-wrap");
+    const houseLabel = document.getElementById("edit-house-label");
+    if (houseLabel) {
+        if (currentUser && currentUser.role && currentUser.role.toLowerCase() === "noble") {
+            houseLabel.classList.remove("hidden");
+        } else {
+            houseLabel.classList.add("hidden");
+        }
+    }
 
     if (usernameInput) usernameInput.value = currentUser.username || "";
     if (curPassInput) curPassInput.value = "";
@@ -222,15 +243,22 @@ function openEditProfileModal() {
     if (photoInput) photoInput.value = "";
 
     if (currentUser.photo_url) {
-        if (previewImg) previewImg.src = currentUser.photo_url;
+        if (previewImg) {
+            previewImg.onerror = () => { previewImg.src = DEFAULT_IMG; };
+            previewImg.src = `/static/pictures/${currentUser.photo_url}`;
+        }
         if (fileNameEl) fileNameEl.textContent = "Current portrait";
-        if (placeholder) placeholder.classList.add("hidden");
-        if (previewWrap) previewWrap.classList.remove("hidden");
     } else {
-        if (previewImg) previewImg.src = "";
-        if (fileNameEl) fileNameEl.textContent = "";
-        if (previewWrap) previewWrap.classList.add("hidden");
-        if (placeholder) placeholder.classList.remove("hidden");
+        if (previewImg) previewImg.src = DEFAULT_IMG;
+        if (fileNameEl) fileNameEl.textContent = "Default portrait";
+    }
+    if (placeholder) {
+        placeholder.classList.add("hidden");
+        placeholder.style.display = "none";
+    }
+    if (previewWrap) {
+        previewWrap.classList.remove("hidden");
+        previewWrap.style.display = "flex";
     }
 
     if (houseSelect) {
@@ -270,7 +298,12 @@ async function saveProfileChanges(e) {
 
     const formData = new FormData();
     formData.append("username", username);
-    formData.append("house_id", houseRaw);
+
+    const isLord = currentUser && currentUser.role && currentUser.role.toLowerCase() === "noble";
+    if (isLord) {
+        formData.append("house_id", houseRaw);
+    }
+
     if (editSelectedPhotoFile) {
         formData.append("photo", editSelectedPhotoFile);
     } else if (editRemoveExistingPhoto) {
