@@ -1,7 +1,8 @@
+import hashlib
+import hmac
 import os
-import base64
-import secrets
 import random
+import secrets
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for, make_response, current_app, session
@@ -12,13 +13,32 @@ from .models import User, Role, House, Stat, Session, Tournament, Participant
 import hmac
 import hashlib
 
+from flask import (
+    Blueprint,
+    current_app,
+    jsonify,
+    make_response,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from .extensions import db
+from .models import House, Role, Session, Stat, User
 
 web_ui = Blueprint("web_ui", __name__, url_prefix="/")
-photo_path = "./app/static/pictures/"  #path for uploaded photos
+photo_path = "./app/static/pictures/"  # path for uploaded photos
+
 
 @web_ui.before_request
 def require_auth():
-    if request.path in ("/login", "/lord-setup", "/knight-setup") or request.path.startswith("/static"):
+    if request.path in (
+        "/login",
+        "/lord-setup",
+        "/knight-setup",
+    ) or request.path.startswith("/static"):
         return None
     if is_banished_ip():
         if request.path != "/nightwatch":
@@ -26,7 +46,7 @@ def require_auth():
         return None
     if request.path == "/login":
         return None
-    
+
     token = request.cookies.get("token")
     if not token:
         return redirect(url_for("web_ui.login"))
@@ -34,10 +54,10 @@ def require_auth():
         resp = redirect(url_for("web_ui.login"))
         resp.delete_cookie("token", path="/")
         return resp
-            
-    session_obj = Session.query.filter_by(id=token).first()   
-    
-    if not session_obj or session_obj.expires_at <= datetime.utcnow():
+
+    session_obj = Session.query.filter_by(id=token).first()
+
+    if not session_obj or session_obj.expires_at <= datetime.datetime.now():
         return redirect(url_for("web_ui.login"))
     else:
         current_user = User.query.get(session_obj.user_id)
@@ -46,34 +66,42 @@ def require_auth():
                 return redirect(url_for("web_ui.nightwatch"))
             return None
 
+
 @web_ui.route("/")
 @web_ui.route("/houses")
 def index():
     return render_template("index.html")
 
+
 @web_ui.route("/knights")
 def knights():
     return render_template("knights.html")
+
 
 @web_ui.route("/lords")
 def lords():
     return render_template("lords.html")
 
+
 @web_ui.route("/login")
 def login():
     return render_template("login.html")
+
 
 @web_ui.route("/profile")
 def profile():
     return render_template("profile.html")
 
+
 @web_ui.route("/nightwatch")
 def nightwatch():
     return render_template("nightwatch.html")
-  
+
+
 @web_ui.route("/lord-setup")
 def lord_setup():
     return render_template("lord_setup.html")
+
 
 @web_ui.route("/knight-setup")
 def knight_setup():
@@ -93,7 +121,9 @@ def handle_404(e):
         return jsonify({"error": "Resource not found"}), 404
     return render_template("404.html"), 404
 
+
 api = Blueprint("api", __name__, url_prefix="/api")
+
 
 def login_required(f):
     @wraps(f)
@@ -109,17 +139,18 @@ def login_required(f):
             return resp
 
         session_obj = Session.query.filter_by(id=token).first()
-        if not session_obj or session_obj.expires_at <= datetime.utcnow():
+        if not session_obj or session_obj.expires_at <= datetime.datetime.now():
             return jsonify({"error": "Invalid or expired session"}), 401
 
         current_user = User.query.get(session_obj.user_id)
         if not current_user:
             return jsonify({"error": "User not found"}), 404
-        
+
         if current_user.nightwatch or is_banished_ip():
             return jsonify({"error": "Banished"}), 403
 
         return f(current_user, *args, **kwargs)
+
     return decorated
 
 
@@ -139,11 +170,13 @@ def get_houses():
     houses = House.query.all()
     result = []
     for h in houses:
-        result.append({
-            "id": h.id,
-            "name": h.name,
-            "motto": h.motto,
-        })
+        result.append(
+            {
+                "id": h.id,
+                "name": h.name,
+                "motto": h.motto,
+            }
+        )
     return jsonify(result), 200
 
 
@@ -155,13 +188,19 @@ def register():
     role_id = data.get("role_id")
 
     if not username or not password or not role_id:
-        return jsonify({"error": "username, password and role_id are required"}), 400
+        return jsonify(
+            {"error": "username, password and role_id are required"}
+        ), 400
 
     if len(username) < 5 or len(username) > 20:
-        return jsonify({"error": "Username must be between 5 and 20 characters"}), 400
+        return jsonify(
+            {"error": "Username must be between 5 and 20 characters"}
+        ), 400
 
     if len(password) < 8 or len(password) > 20:
-        return jsonify({"error": "Password must be between 8 and 20 characters"}), 400
+        return jsonify(
+            {"error": "Password must be between 8 and 20 characters"}
+        ), 400
 
     if User.query.filter_by(username=username).first():
         return jsonify({"error": "Username already taken"}), 409
@@ -186,37 +225,38 @@ def register():
 
     token = secrets.token_hex(32)
     ip_now = get_client_ip()
-    
+
     new_session = Session(
         id=token,
         user_id=user.id,
-        expires_at=datetime.utcnow() + timedelta(days=1),
+        expires_at=datetime.datetime.now() + timedelta(days=1),
         ip_address=ip_now,
     )
     db.session.add(new_session)
     db.session.commit()
 
-    response = make_response(jsonify({
-        "message": "Registered successfully",
-        "user": {
-            "id": user.id,
-            "username": user.username,
-            "role": role.role_name,
-            "house_id": user.house_id,
-        }
-    }), 201)
+    response = make_response(
+        jsonify(
+            {
+                "message": "Registered successfully",
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "role": role.role_name,
+                    "house_id": user.house_id,
+                },
+            }
+        ),
+        201,
+    )
     response.set_cookie(
-        "token", token,
-        httponly=True,
-        path="/",
-        samesite="Lax",
-        max_age=86400
+        "token", token, httponly=True, path="/", samesite="Lax", max_age=86400
     )
     return response
 
 
 @api.route("/auth/login", methods=["POST"])
-def login():
+def auth_login():
     data = request.get_json() or {}
     username = data.get("username", "").strip()
     password = data.get("password", "")
@@ -228,11 +268,11 @@ def login():
 
     token = secrets.token_hex(32)
     ip_now = get_client_ip()
-        
+
     new_session = Session(
         id=token,
         user_id=user.id,
-        expires_at=datetime.utcnow() + timedelta(days=28 if remember_me else 1),
+        expires_at=datetime.datetime.now() + timedelta(days=28 if remember_me else 1),
         ip_address=ip_now,
         remember_me=remember_me,
     )
@@ -253,11 +293,12 @@ def login():
 
     response = make_response(jsonify(payload), 200)
     response.set_cookie(
-        "token", token,
+        "token",
+        token,
         httponly=True,
         path="/",
         samesite="Lax",
-        max_age=2592000 if remember_me else 86400
+        max_age=2592000 if remember_me else 86400,
     )
 
     return response
@@ -269,10 +310,12 @@ def logout(current_user):
     token = request.cookies.get("token", "")
     session = Session.query.filter_by(id=token).first()
     if session:
-        session.expires_at = datetime.utcnow()
+        session.expires_at = datetime.datetime.now()()
         db.session.commit()
     response = make_response(jsonify({"message": "Logged out"}), 200)
-    response.set_cookie("token", "", max_age=0, path="/", httponly=True, samesite="Lax")
+    response.set_cookie(
+        "token", "", max_age=0, path="/", httponly=True, samesite="Lax"
+    )
     return response
 
 
@@ -281,29 +324,47 @@ def logout(current_user):
 def get_me(current_user):
     role_name = current_user.role.role_name.lower() if current_user.role else ""
     is_knight = role_name == "knight"
-    
-    return jsonify({
-        "id": current_user.id,
-        "username": current_user.username,
-        "role": current_user.role.role_name,
-        "house_id": current_user.house_id,
-        "photo_url": current_user.photo_url,
-        "is_white_knight": current_user.is_white_knight,
-        "stats": {
-            "strength": current_user.stats.strength if current_user.stats else 0,
-            "defense": current_user.stats.defense if current_user.stats else 0,
-            "endurance": current_user.stats.endurance if current_user.stats else 0,
-        },
-        "gossip_key": current_user.stats.key if (is_knight and current_user.stats) else None,
-        "next_key": current_user.stats.next_key.isoformat() if (is_knight and current_user.stats and current_user.stats.next_key) else None,
-        "gossip_target_id": current_user.stats.gossip_target_id if (is_knight and current_user.stats) else None,
-    }), 200
+
+    return jsonify(
+        {
+            "id": current_user.id,
+            "username": current_user.username,
+            "role": current_user.role.role_name,
+            "house_id": current_user.house_id,
+            "photo_url": current_user.photo_url,
+            "is_white_knight": current_user.is_white_knight,
+            "stats": {
+                "strength": current_user.stats.strength
+                if current_user.stats
+                else 0,
+                "defense": current_user.stats.defense
+                if current_user.stats
+                else 0,
+                "endurance": current_user.stats.endurance
+                if current_user.stats
+                else 0,
+            },
+            "gossip_key": current_user.stats.key
+            if (is_knight and current_user.stats)
+            else None,
+            "next_key": current_user.stats.next_key.isoformat()
+            if (
+                is_knight and current_user.stats and current_user.stats.next_key
+            )
+            else None,
+            "gossip_target_id": current_user.stats.gossip_target_id
+            if (is_knight and current_user.stats)
+            else None,
+        }
+    ), 200
 
 
 @api.route("/me", methods=["PUT", "PATCH"])
 @login_required
 def update_me(current_user):
-    is_multipart = request.content_type and "multipart/form-data" in request.content_type
+    is_multipart = (
+        request.content_type and "multipart/form-data" in request.content_type
+    )
     data = request.form if is_multipart else (request.get_json() or {})
 
     if "username" in data:
@@ -311,8 +372,12 @@ def update_me(current_user):
         if not new_username:
             return jsonify({"error": "Username cannot be empty"}), 400
         if len(new_username) < 5 or len(new_username) > 20:
-            return jsonify({"error": "Username must be between 5 and 20 characters long"}), 400
-        existing = User.query.filter(User.username == new_username, User.id != current_user.id).first()
+            return jsonify(
+                {"error": "Username must be between 5 and 20 characters long"}
+            ), 400
+        existing = User.query.filter(
+            User.username == new_username, User.id != current_user.id
+        ).first()
         if existing:
             return jsonify({"error": "Username already taken"}), 409
         current_user.username = new_username
@@ -324,7 +389,7 @@ def update_me(current_user):
         else:
             try:
                 house_id_int = int(raw_house)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 return jsonify({"error": "Invalid house_id"}), 400
             house = House.query.get(house_id_int)
             if not house:
@@ -335,17 +400,27 @@ def update_me(current_user):
     photo_file = request.files.get("photo") if is_multipart else None
     if photo_file and photo_file.filename:
         allowed_exts = {"png", "jpg", "jpeg", "webp"}
-        ext = photo_file.filename.rsplit(".", 1)[-1].lower() if "." in photo_file.filename else ""
+        ext = (
+            photo_file.filename.rsplit(".", 1)[-1].lower()
+            if "." in photo_file.filename
+            else ""
+        )
         if ext not in allowed_exts:
-            return jsonify({"error": "Invalid format. Please choose PNG, JPG, or WEBP."}), 400
+            return jsonify(
+                {"error": "Invalid format. Please choose PNG, JPG, or WEBP."}
+            ), 400
 
         photo_file.seek(0, os.SEEK_END)
         file_size = photo_file.tell()
         photo_file.seek(0)
         if file_size > 5 * 1024 * 1024:
-            return jsonify({"error": "Image is too large. Maximum size is 5 MB."}), 400
+            return jsonify(
+                {"error": "Image is too large. Maximum size is 5 MB."}
+            ), 400
 
-        encoded_url = save_uploaded_photo(photo_file, current_user.id, current_user.username)
+        encoded_url = save_uploaded_photo(
+            photo_file, current_user.id, current_user.username
+        )
         if not encoded_url:
             return jsonify({"error": "Failed to process uploaded image."}), 400
         current_user.photo_url = encoded_url
@@ -355,25 +430,33 @@ def update_me(current_user):
     if data.get("new_password"):
         current_password = data.get("current_password", "")
         new_password = str(data["new_password"])
-        if not current_password or not check_password_hash(current_user.password, current_password):
+        if not current_password or not check_password_hash(
+            current_user.password, current_password
+        ):
             return jsonify({"error": "Current password is incorrect"}), 400
         if len(new_password) < 8 or len(new_password) > 20:
-            return jsonify({"error": "New password must be between 8 and 20 characters long"}), 400
+            return jsonify(
+                {
+                    "error": "New password must be between 8 and 20 characters long"
+                }
+            ), 400
         current_user.password = generate_password_hash(new_password)
 
     db.session.commit()
 
-    return jsonify({
-        "message": "Profile updated successfully",
-        "user": {
-            "id": current_user.id,
-            "username": current_user.username,
-            "role": current_user.role.role_name,
-            "house_id": current_user.house_id,
-            "photo_url": current_user.photo_url,
-            "is_white_knight": current_user.is_white_knight,
+    return jsonify(
+        {
+            "message": "Profile updated successfully",
+            "user": {
+                "id": current_user.id,
+                "username": current_user.username,
+                "role": current_user.role.role_name,
+                "house_id": current_user.house_id,
+                "photo_url": current_user.photo_url,
+                "is_white_knight": current_user.is_white_knight,
+            },
         }
-    }), 200
+    ), 200
 
 
 @api.route("/me/gossip-key", methods=["POST"])
@@ -381,54 +464,66 @@ def update_me(current_user):
 def update_gossip_key(current_user):
     role_name = current_user.role.role_name.lower() if current_user.role else ""
     if role_name != "knight":
-        return jsonify({"error": "Only knights can generate a gossip key."}), 403
-    
+        return jsonify(
+            {"error": "Only knights can generate a gossip key."}
+        ), 403
+
     stat = current_user.stats
     if not stat:
         stat = Stat(user_id=current_user.id)
         db.session.add(stat)
-    
-    now = datetime.utcnow()
+
+    now = datetime.datetime.now()()
     if stat.next_key and now < stat.next_key:
         remaining = stat.next_key - now
         hours, remainder = divmod(int(remaining.total_seconds()), 3600)
         minutes = remainder // 60
-        return jsonify({
-            "error": f"Key cannot be updated yet. Try again in {hours}h {minutes}m.",
-            "next_key": stat.next_key.isoformat()
-        }), 429
-    
+        return jsonify(
+            {
+                "error": f"Key cannot be updated yet. Try again in {hours}h {minutes}m.",
+                "next_key": stat.next_key.isoformat(),
+            }
+        ), 429
+
     stat.key = secrets.token_hex(8)
     stat.next_key = now + timedelta(days=1)
     stat.gossip_target_id = None
     db.session.commit()
-    
-    return jsonify({
-        "message": "Gossip key updated",
-        "gossip_key": stat.key,
-        "next_key": stat.next_key.isoformat()
-    }), 200
+
+    return jsonify(
+        {
+            "message": "Gossip key updated",
+            "gossip_key": stat.key,
+            "next_key": stat.next_key.isoformat(),
+        }
+    ), 200
 
 
 @api.route("/houses/<int:house_id>/members", methods=["GET"])
 @login_required
 def get_house_members(current_user, house_id):
     if current_user.house_id != house_id:
-        return jsonify({"error": "Access denied. You can only view members of your own house."}), 403
+        return jsonify(
+            {
+                "error": "Access denied. You can only view members of your own house."
+            }
+        ), 403
 
     members = User.query.filter_by(house_id=house_id).all()
     result = []
     for m in members:
-        result.append({
-            "id": m.id,
-            "username": m.username,
-            "role": m.role.role_name,
-            "stats": {
-                "strength": m.stats.strength if m.stats else 0,
-                "defense": m.stats.defense if m.stats else 0,
-                "endurance": m.stats.endurance if m.stats else 0,
+        result.append(
+            {
+                "id": m.id,
+                "username": m.username,
+                "role": m.role.role_name,
+                "stats": {
+                    "strength": m.stats.strength if m.stats else 0,
+                    "defense": m.stats.defense if m.stats else 0,
+                    "endurance": m.stats.endurance if m.stats else 0,
+                },
             }
-        })
+        )
     return jsonify(result), 200
 
 
@@ -443,7 +538,11 @@ def update_house(current_user, house_id):
     is_house_lord = user_role == "noble"
 
     if current_user.house_id != house_id or not is_house_lord:
-        return jsonify({"error": "Access denied. Only lords of this house can edit its info."}), 403
+        return jsonify(
+            {
+                "error": "Access denied. Only lords of this house can edit its info."
+            }
+        ), 403
 
     data = request.get_json() or {}
 
@@ -452,10 +551,16 @@ def update_house(current_user, house_id):
         if not new_name:
             return jsonify({"error": "House name cannot be empty"}), 400
         if len(new_name) < 5 or len(new_name) > 20:
-            return jsonify({"error": "House name must be between 5 and 20 characters"}), 400
-        existing = House.query.filter(House.name == new_name, House.id != house_id).first()
+            return jsonify(
+                {"error": "House name must be between 5 and 20 characters"}
+            ), 400
+        existing = House.query.filter(
+            House.name == new_name, House.id != house_id
+        ).first()
         if existing:
-            return jsonify({"error": "A house with this name already exists"}), 409
+            return jsonify(
+                {"error": "A house with this name already exists"}
+            ), 409
         house.name = new_name
 
     if "motto" in data:
@@ -463,86 +568,116 @@ def update_house(current_user, house_id):
         if not new_motto:
             return jsonify({"error": "House motto cannot be empty"}), 400
         if len(new_motto) < 5 or len(new_motto) > 30:
-            return jsonify({"error": "Motto must be between 5 and 30 characters"}), 400
+            return jsonify(
+                {"error": "Motto must be between 5 and 30 characters"}
+            ), 400
         house.motto = new_motto
 
     db.session.commit()
 
-    return jsonify({
-        "message": "House info updated successfully",
-        "house": {
-            "id": house.id,
-            "name": house.name,
-            "motto": house.motto,
+    return jsonify(
+        {
+            "message": "House info updated successfully",
+            "house": {
+                "id": house.id,
+                "name": house.name,
+                "motto": house.motto,
+            },
         }
-    }), 200
+    ), 200
 
 
 @api.route("/knights", methods=["GET"])
 @login_required
 def get_knights(current_user):
-    knight_role = Role.query.filter(db.func.lower(Role.role_name) == "knight").first()
+    knight_role = Role.query.filter(
+        db.func.lower(Role.role_name) == "knight"
+    ).first()
     if not knight_role:
         return jsonify([]), 200
-    
+
     knights = User.query.filter(
-        User.role_id == knight_role.id,
-        User.nightwatch.isnot(True)
+        User.role_id == knight_role.id, User.nightwatch.isnot(True)
     ).all()
-    viewer_role = current_user.role.role_name.lower() if current_user.role.role_name else ""
-    revealed_target_id = current_user.stats.gossip_target_id if (current_user.stats and current_user.stats.gossip_target_id) else ""
-    
+    viewer_role = (
+        current_user.role.role_name.lower()
+        if current_user.role.role_name
+        else ""
+    )
+    revealed_target_id = (
+        current_user.stats.gossip_target_id
+        if (current_user.stats and current_user.stats.gossip_target_id)
+        else ""
+    )
+
     result = []
     for k in knights:
-        is_same_house = (current_user.house_id is not None and current_user.house_id == k.house_id)
-        is_revealed = (viewer_role == "knight" and revealed_target_id == k.id)
-        can_see_stats = k.is_white_knight or (k.id == current_user.id) or is_revealed or is_same_house
-        
-        result.append({
-            "id": k.id,
-            "username": k.username,
-            "role": k.role.role_name,
-            "house_id": k.house_id,
-            "photo_url": k.photo_url,
-            "is_white_knight": k.is_white_knight,
-            "stats": {
-                "strength": k.stats.strength,
-                "defense": k.stats.defense,
-                "endurance": k.stats.endurance,
-            } if (can_see_stats and k.stats) else None
-        })
-        
+        is_same_house = (
+            current_user.house_id is not None
+            and current_user.house_id == k.house_id
+        )
+        is_revealed = viewer_role == "knight" and revealed_target_id == k.id
+        can_see_stats = (
+            k.is_white_knight
+            or (k.id == current_user.id)
+            or is_revealed
+            or is_same_house
+        )
+
+        result.append(
+            {
+                "id": k.id,
+                "username": k.username,
+                "role": k.role.role_name,
+                "house_id": k.house_id,
+                "photo_url": k.photo_url,
+                "is_white_knight": k.is_white_knight,
+                "stats": {
+                    "strength": k.stats.strength,
+                    "defense": k.stats.defense,
+                    "endurance": k.stats.endurance,
+                }
+                if (can_see_stats and k.stats)
+                else None,
+            }
+        )
+
     return jsonify(result), 200
 
 
 @api.route("/lords", methods=["GET"])
 @login_required
 def get_lords(current_user):
-    noble_role = Role.query.filter(db.func.lower(Role.role_name) == "noble").first()
+    noble_role = Role.query.filter(
+        db.func.lower(Role.role_name) == "noble"
+    ).first()
     if not noble_role:
         return jsonify([]), 200
 
     lords = User.query.filter(
-        User.role_id == noble_role.id,
-        User.nightwatch.isnot(True)
+        User.role_id == noble_role.id, User.nightwatch.isnot(True)
     ).all()
-    return jsonify([
-        {
-            "id": l.id,
-            "username": l.username,
-            "role": l.role.role_name,
-            "house_id": l.house_id,
-            "photo_url": l.photo_url,
-            "stats": None
-        }
-        for l in lords
-    ]), 200
+    return jsonify(
+        [
+            {
+                "id": l.id,
+                "username": l.username,
+                "role": l.role.role_name,
+                "house_id": l.house_id,
+                "photo_url": l.photo_url,
+                "stats": None,
+            }
+            for l in lords
+        ]
+    ), 200
 
 
 @api.route("/gossip", methods=["POST"])
 @login_required
 def use_gossip(current_user):
-    viewer_role = current_user.role.role_name.lower() if current_user.role else ""
+    viewer_role = (
+        current_user.role.role_name.lower() if current_user.role else ""
+    )
     if viewer_role != "knight":
         return jsonify({"error": "Only knights can use gossip."}), 403
 
@@ -551,47 +686,76 @@ def use_gossip(current_user):
     target_id = data.get("target_id")
 
     if not provided_key or not target_id:
-        return jsonify({"error": "Both gossip key and target_id are required."}), 400
+        return jsonify(
+            {"error": "Both gossip key and target_id are required."}
+        ), 400
 
     stat = current_user.stats
     if not stat or not stat.key:
-        return jsonify({"error": "You do not have an active gossip key. Generate one in your Profile first."}), 400
+        return jsonify(
+            {
+                "error": "You do not have an active gossip key. Generate one in your Profile first."
+            }
+        ), 400
 
-    if stat.next_key and datetime.utcnow() >= stat.next_key:
-        return jsonify({"error": "Your gossip key has expired. Update it in your Profile."}), 400
+    if stat.next_key and datetime.datetime.now()() >= stat.next_key:
+        return jsonify(
+            {"error": "Your gossip key has expired. Update it in your Profile."}
+        ), 400
 
     if not secrets.compare_digest(stat.key, provided_key):
         return jsonify({"error": "Invalid gossip key."}), 403
 
     if stat.gossip_target_id is not None:
-        return jsonify({"error": "You have already used your gossip key for today."}), 429
+        return jsonify(
+            {"error": "You have already used your gossip key for today."}
+        ), 429
 
     target = User.query.get(target_id)
-    if not target or not target.role or target.role.role_name.lower() != "knight":
+    if (
+        not target
+        or not target.role
+        or target.role.role_name.lower() != "knight"
+    ):
         return jsonify({"error": "Target knight not found."}), 404
 
-    if current_user.house_id is not None and target.house_id == current_user.house_id:
-        return jsonify({"error": "You already know the stats of knights from your own house."}), 400
+    if (
+        current_user.house_id is not None
+        and target.house_id == current_user.house_id
+    ):
+        return jsonify(
+            {
+                "error": "You already know the stats of knights from your own house."
+            }
+        ), 400
 
     stat.gossip_target_id = target.id
     db.session.commit()
 
-    return jsonify({
-        "message": f"Combat stats revealed for {target.username}.",
-        "target_id": target.id,
-        "stats": {
-            "strength": target.stats.strength if target.stats else 0,
-            "defense": target.stats.defense if target.stats else 0,
-            "endurance": target.stats.endurance if target.stats else 0,
+    return jsonify(
+        {
+            "message": f"Combat stats revealed for {target.username}.",
+            "target_id": target.id,
+            "stats": {
+                "strength": target.stats.strength if target.stats else 0,
+                "defense": target.stats.defense if target.stats else 0,
+                "endurance": target.stats.endurance if target.stats else 0,
+            },
         }
-    }), 200 
-    
+    ), 200
+
+
 def hash_ip(ip: str) -> str:
     if not ip:
         return ""
 
-    secret = current_app.config.get("IP_SECRET") or current_app.config.get("SECRET_KEY")
-    return hmac.new(secret.encode("utf-8"), ip.encode("utf-8"), hashlib.sha256).hexdigest()
+    secret = current_app.config.get("IP_SECRET") or current_app.config.get(
+        "SECRET_KEY"
+    )
+    return hmac.new(
+        secret.encode("utf-8"), ip.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
+
 
 def get_client_ip():
     forwarded = request.headers.get("X-Forwarded-For", "")
@@ -607,61 +771,57 @@ def get_client_ip():
 def ban_with_nightwatch(current_user, target_id):
     target = User.query.get(target_id)
     if not target:
-        return jsonify({
-            "error": "Can't find offender"
-        }), 404
+        return jsonify({"error": "Can't find offender"}), 404
 
     if target.id == current_user.id:
-        return jsonify({
-            "error": "Can't ban yourself"
-        }), 400
+        return jsonify({"error": "Can't ban yourself"}), 400
 
     if not target.role or not current_user.role:
-        return jsonify({
-            "error": "Can't detect your highness"
-        }), 400
+        return jsonify({"error": "Can't detect your highness"}), 400
 
     if current_user.role.role_name.lower() != "noble":
-        return jsonify({
-            "error": "Only lords can send someone to the Night's Watch"
-        }), 403
+        return jsonify(
+            {"error": "Only lords can send someone to the Night's Watch"}
+        ), 403
 
     target_role = target.role.role_name.lower()
 
     if target_role in ("noble", "knight"):
-        if current_user.house_id and target.house_id and current_user.house_id == target.house_id:
+        if (
+            current_user.house_id
+            and target.house_id
+            and current_user.house_id == target.house_id
+        ):
             target.nightwatch = True
             target.house_id = None
             db.session.commit()
-            return jsonify({
-                "message": f"{target_role.capitalize()} was banned"
-            }), 200
+            return jsonify(
+                {"message": f"{target_role.capitalize()} was banned"}
+            ), 200
         else:
-            return jsonify({
-                "error": f"Can't ban {target_role} from another house"
-            }), 403
+            return jsonify(
+                {"error": f"Can't ban {target_role} from another house"}
+            ), 403
     else:
         target.nightwatch = True
         db.session.commit()
-        return jsonify({
-            "message": "Commonfolk was banned"
-        }), 200
-        
-        
-def is_banished_ip():    
+        return jsonify({"message": "Commonfolk was banned"}), 200
+
+
+def is_banished_ip():
     ip_now = get_client_ip()
-    
+
     if ip_now:
         found_user = (
-            User.query
-            .join(Session, User.id == Session.user_id)
+            User.query.join(Session, User.id == Session.user_id)
             .filter(Session.ip_address == ip_now, User.nightwatch.is_(True))
             .first()
         )
         if found_user:
             return True
-            
+
     return False
+
 
 def compare_ip():
     ip_now = get_client_ip()
@@ -672,12 +832,17 @@ def compare_ip():
     session_obj = Session.query.filter_by(id=token).first()
     if session_obj.remember_me:
         return False
-    if session_obj and session_obj.ip_address and session_obj.ip_address != ip_now:
-        session_obj.expires_at = datetime.utcnow()
+    if (
+        session_obj
+        and session_obj.ip_address
+        and session_obj.ip_address != ip_now
+    ):
+        session_obj.expires_at = datetime.datetime.now()()
         db.session.commit()
         return True
 
     return False
+
 
 def save_uploaded_photo(photo, user_id, user_name):
     if not photo or not photo.filename:
@@ -709,9 +874,13 @@ def setup_lord(current_user):
     if not house:
         return jsonify({"error": "House not found"}), 404
 
-    photo_url = save_uploaded_photo(photo, current_user.id, current_user.username)
+    photo_url = save_uploaded_photo(
+        photo, current_user.id, current_user.username
+    )
     if not photo_url:
-        return jsonify({"error": "Valid photo (png, jpg, webp) is required"}), 400
+        return jsonify(
+            {"error": "Valid photo (png, jpg, webp) is required"}
+        ), 400
 
     current_user.photo_url = photo_url
     current_user.house_id = house.id
@@ -737,13 +906,23 @@ def setup_knight(current_user):
     except ValueError:
         return jsonify({"error": "Stats must be numbers"}), 400
 
-    for stat_val, stat_name in [(strength, "Strength"), (defense, "Defense"), (endurance, "Endurance")]:
+    for stat_val, stat_name in [
+        (strength, "Strength"),
+        (defense, "Defense"),
+        (endurance, "Endurance"),
+    ]:
         if not (0 <= stat_val <= 20):
-            return jsonify({"error": f"{stat_name} must be between 0 and 20"}), 400
+            return jsonify(
+                {"error": f"{stat_name} must be between 0 and 20"}
+            ), 400
 
-    photo_url = save_uploaded_photo(photo, current_user.id, current_user.username)
+    photo_url = save_uploaded_photo(
+        photo, current_user.id, current_user.username
+    )
     if not photo_url:
-        return jsonify({"error": "Valid photo (png, jpg, webp) is required"}), 400
+        return jsonify(
+            {"error": "Valid photo (png, jpg, webp) is required"}
+        ), 400
 
     current_user.photo_url = photo_url
     current_user.is_white_knight = is_white_knight
@@ -756,7 +935,9 @@ def setup_knight(current_user):
             return jsonify({"error": "House not found"}), 404
         current_user.house_id = house.id
     else:
-        return jsonify({"error": "Great House is required for sworn knights"}), 400
+        return jsonify(
+            {"error": "Great House is required for sworn knights"}
+        ), 400
 
     if not current_user.stats:
         current_user.stats = Stat(user_id=current_user.id)
