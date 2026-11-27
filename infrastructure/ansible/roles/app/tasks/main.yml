@@ -54,6 +54,7 @@
       - "--exclude=__pycache__"
       - "--exclude=*.pyc"
       - "--exclude=.pytest_cache"
+  notify: Restart Web Service
 
 - name: Install requirements into virtualenv
   ansible.builtin.pip:

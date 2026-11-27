@@ -8,6 +8,10 @@
   ansible.builtin.systemd:
     name: web
     state: restarted
+  notify: Reload Consul
+
+- name: Reload Consul
+  ansible.builtin.command: consul reload
 
 - name: Restart resolved
   ansible.builtin.systemd:
