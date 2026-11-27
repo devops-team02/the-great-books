@@ -598,6 +598,23 @@ body {
     color: var(--text-muted);
 }
 
+.auth-form label.checkbox-label {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.auth-form label.checkbox-label input[type="checkbox"] {
+    width: 1.1rem;
+    height: 1.1rem;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--gold);
+}
+
 .auth-form input,
 .auth-form select {
     padding: 0.7rem;

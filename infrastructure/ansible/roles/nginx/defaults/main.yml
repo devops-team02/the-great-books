@@ -1,0 +1,8 @@
+---
+nginx_site_name: the-great-books
+nginx_listen_port: 80
+nginx_backend_port: 80
+nginx_max_fails: 3
+nginx_fail_timeout: 10s
+nginx_proxy_connect_timeout: 5s
+nginx_proxy_read_timeout: 30s

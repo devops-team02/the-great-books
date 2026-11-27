@@ -2,13 +2,15 @@ import os
 import base64
 import secrets
 import random
+import hmac
+import hashlib
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for, make_response, current_app, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from .extensions import db
-from .models import User, Role, House, Stat, Session, Requests
+from .models import User, Role, House, Stat, Session, Requests, Tournament, Participant
 
 web_ui = Blueprint("web_ui", __name__, url_prefix="/")
 photo_path = "./app/static/pictures/"  #path for uploaded photos
@@ -82,6 +84,14 @@ def lord_setup():
 def knight_setup():
     return render_template("knight_setup.html")
 
+@web_ui.route("/tournaments")
+def tournaments():
+    return render_template("tournaments.html")
+
+@web_ui.route("/tournaments/<int:tournament_id>")
+def tournament_detail(tournament_id):
+    return render_template("tournament_detail.html", tournament_id=tournament_id)
+
 @web_ui.app_errorhandler(404)
 def handle_404(e):
     if request.path.startswith("/api/"):
@@ -138,7 +148,6 @@ def get_houses():
             "id": h.id,
             "name": h.name,
             "motto": h.motto,
-            
         })
     return jsonify(result), 200
 
@@ -216,6 +225,7 @@ def login():
     data = request.get_json() or {}
     username = data.get("username", "").strip()
     password = data.get("password", "")
+    remember_me = data.get("remember_me", False)
 
     user = User.query.filter_by(username=username).first()
     if not user or not check_password_hash(user.password, password):
@@ -229,8 +239,9 @@ def login():
     new_session = Session(
         id=token,
         user_id=user.id,
-        expires_at=datetime.utcnow() + timedelta(days=1),
+        expires_at=datetime.utcnow() + timedelta(days=28 if remember_me else 1),
         ip_address=ip_now,
+        remember_me=remember_me,
     )
     db.session.add(new_session)
     db.session.commit()
@@ -253,7 +264,7 @@ def login():
         httponly=True,
         path="/",
         samesite="Lax",
-        max_age=86400
+        max_age=2592000 if remember_me else 86400
     )
 
     return response
@@ -275,6 +286,7 @@ def logout(current_user):
 @api.route("/me", methods=["GET"])
 @login_required
 def get_me(current_user):
+    check_expired_requests()
     role_name = current_user.role.role_name.lower() if current_user.role else ""
     is_knight = role_name == "knight"
     active_req = Requests.query.filter_by(user_id=current_user.id).first()
@@ -286,7 +298,6 @@ def get_me(current_user):
         "house_id": current_user.house_id,
         "pending_request_house_id": active_req.house_id if active_req else None,
         "photo_url": current_user.photo_url,
-        "photo_url": current_user.photo_url,
         "is_white_knight": current_user.is_white_knight,
         "stats": {
             "strength": current_user.stats.strength if current_user.stats else 0,
@@ -296,7 +307,6 @@ def get_me(current_user):
         "gossip_key": current_user.stats.key if (is_knight and current_user.stats) else None,
         "next_key": current_user.stats.next_key.isoformat() if (is_knight and current_user.stats and current_user.stats.next_key) else None,
         "gossip_target_id": current_user.stats.gossip_target_id if (is_knight and current_user.stats) else None,
-        "pending_request_house_id": active_req.house_id if active_req else None,
     }), 200
 
 
@@ -638,14 +648,20 @@ def use_gossip(current_user):
         }
     }), 200 
     
-    
+def hash_ip(ip: str) -> str:
+    if not ip:
+        return ""
+
+    secret = current_app.config.get("IP_SECRET") or current_app.config.get("SECRET_KEY")
+    return hmac.new(secret.encode("utf-8"), ip.encode("utf-8"), hashlib.sha256).hexdigest()
+
 def get_client_ip():
     forwarded = request.headers.get("X-Forwarded-For", "")
     if forwarded:
         ip = forwarded.split(",")[0].strip()
     else:
         ip = request.remote_addr or ""
-    return ip[:45]
+    return hash_ip(ip)
 
 
 @api.route("/nightwatch/<int:target_id>", methods=["POST"])
@@ -741,6 +757,8 @@ def compare_ip():
         return False
 
     session_obj = Session.query.filter_by(id=token).first()
+    if session_obj and session_obj.remember_me:
+        return False
     if session_obj and session_obj.ip_address and session_obj.ip_address != ip_now:
         session_obj.expires_at = datetime.utcnow()
         db.session.commit()
@@ -796,7 +814,6 @@ def setup_knight(current_user):
         return jsonify({"error": "Only knights can access this"}), 403
 
     is_white_knight = request.form.get("is_white_knight") == "true"
-    # house_raw = (request.form.get("house_id") or "").strip()
     photo = request.files.get("photo")
 
     try:
@@ -816,7 +833,6 @@ def setup_knight(current_user):
 
     current_user.photo_url = photo_url
     current_user.is_white_knight = is_white_knight
-    
     current_user.house_id = None
 
     if not current_user.stats:
@@ -829,9 +845,10 @@ def setup_knight(current_user):
     db.session.commit()
     return jsonify({"message": "Knight profile saved"}), 200
 
+
 def check_expired_requests():
-    expired = Requests.query.filter(Requests.expires_at <= datetime.utcnow())
-    if(not expired):
+    expired = Requests.query.filter(Requests.expires_at <= datetime.utcnow()).all()
+    if not expired:
         return
     for req in expired:
         user = User.query.get(req.user_id)
@@ -840,7 +857,8 @@ def check_expired_requests():
             user.house_id = None
         db.session.delete(req)
     db.session.commit()
-    
+
+
 @api.route("/houses/<int:house_id>/request", methods=["POST"])
 @login_required
 def create_join_request(current_user, house_id):
@@ -960,3 +978,172 @@ def mark_request_imposter(current_user, req_id):
     db.session.commit()
 
     return jsonify({"message": f"{username} marked as imposter and banished to the Night's Watch"}), 200
+
+
+@api.route("/tournaments", methods=["GET"])
+@login_required
+def get_tournaments(current_user):
+    now = datetime.utcnow()
+    tournaments = (Tournament.query.filter(Tournament.end_date > now).order_by(Tournament.start_date.asc()).all())
+    result = []
+    for t in tournaments:
+        lord_house_name = t.lord.house.name if (t.lord and t.lord.house) else None
+        result.append(
+        {
+            "id": t.id,
+            "tournament_date": t.tournament_date,
+            "max_participants": t.max_participants,
+            "start_date": t.start_date.isoformat(),
+            "end_date": t.end_date.isoformat(),
+            "participants_count": len(t.participants),
+            "is_started": now >= t.start_date,
+            "lord": {
+                "id": t.lord.id if t.lord else None,
+                "username": t.lord.username if t.lord else "Unknown",
+                "house_name": lord_house_name,
+            },
+        })
+    
+    return jsonify(result), 200
+
+
+@api.route("/tournaments", methods=["POST"])
+@login_required
+def create_tournament(current_user):
+    role_name = current_user.role.role_name.lower() if current_user.role else ""
+    if role_name != "noble":
+        return jsonify({"error": "Only lords can create tournaments"}), 403
+
+    data = request.get_json() or {}
+    tournament_date = str(data.get("tournament_date", "")).strip()
+    max_participants_raw = data.get("max_participants")
+    start_date_raw = str(data.get("start_date", "")).strip()
+    end_date_raw = str(data.get("end_date", "")).strip()
+
+    if not tournament_date or max_participants_raw is None or not start_date_raw or not end_date_raw:
+        return jsonify({"error": "All fields are required"}), 400
+
+    if len(tournament_date) > 30:
+        return jsonify({"error": "Tournament date/title must be 30 characters or fewer"}), 400
+
+    try:
+        max_participants = int(max_participants_raw)
+    except (ValueError, TypeError):
+        return jsonify({"error": "max_participants must be a number"}), 400
+
+    if max_participants <= 0:
+        return jsonify({"error": "max_participants must be greater than 0"}), 400
+
+    try:
+        start_date = datetime.fromisoformat(start_date_raw.replace("Z", ""))
+        end_date = datetime.fromisoformat(end_date_raw.replace("Z", ""))
+    except ValueError:
+        return jsonify({"error": "Invalid date format"}), 400
+
+    now = datetime.utcnow()
+    if start_date >= end_date:
+        return jsonify({"error": "Start date must be before end date"}), 400
+
+    if end_date <= now:
+        return jsonify({"error": "End date must be in the future"}), 400
+
+    tournament = Tournament(
+        lord_id=current_user.id,
+        tournament_date=tournament_date,
+        max_participants=max_participants,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    db.session.add(tournament)
+    db.session.commit()
+
+    return jsonify({
+        "message": "Tournament created successfully",
+        "tournament": {
+            "id": tournament.id,
+            "tournament_date": tournament.tournament_date,
+            "max_participants": tournament.max_participants,
+            "start_date": tournament.start_date.isoformat(),
+            "end_date": tournament.end_date.isoformat(),
+        }
+    }), 201
+
+
+@api.route("/tournaments/<int:tournament_id>", methods=["GET"])
+@login_required
+def get_tournament_detail(current_user, tournament_id):
+    t = Tournament.query.get(tournament_id)
+    if not t:
+        return jsonify({"error": "Tournament not found"}), 404
+
+    now = datetime.utcnow()
+    if now >= t.end_date:
+        return jsonify({"error": "Tournament has already ended"}), 404
+
+    participants_list = []
+    for p in t.participants:
+        knight = p.knight
+        if not knight:
+            continue
+        participants_list.append({
+            "id": knight.id,
+            "username": knight.username,
+            "photo_url": knight.photo_url,
+            "house_name": knight.house.name if knight.house else None,
+            "is_white_knight": knight.is_white_knight,
+            "joined_at": p.joined_at.isoformat() if p.joined_at else None,
+        })
+
+    is_joined = any(p.knight_id == current_user.id for p in t.participants)
+
+    return jsonify({
+        "id": t.id,
+        "tournament_date": t.tournament_date,
+        "max_participants": t.max_participants,
+        "start_date": t.start_date.isoformat(),
+        "end_date": t.end_date.isoformat(),
+        "is_started": now >= t.start_date,
+        "is_joined": is_joined,
+        "participants_count": len(participants_list),
+        "lord": {
+            "id": t.lord.id if t.lord else None,
+            "username": t.lord.username if t.lord else "Unknown",
+            "house_name": t.lord.house.name if (t.lord and t.lord.house) else None,
+        },
+        "participants": participants_list,
+    }), 200
+
+
+@api.route("/tournaments/<int:tournament_id>/join", methods=["POST"])
+@login_required
+def join_tournament(current_user, tournament_id):
+    role_name = current_user.role.role_name.lower() if current_user.role else ""
+    if role_name != "knight":
+        return jsonify({"error": "Only knights can join tournaments"}), 403
+
+    t = Tournament.query.get(tournament_id)
+    if not t:
+        return jsonify({"error": "Tournament not found"}), 404
+
+    now = datetime.utcnow()
+    if now >= t.start_date:
+        return jsonify({"error": "Registration for this tournament is closed"}), 400
+
+    if len(t.participants) >= t.max_participants:
+        return jsonify({"error": "Tournament is already full"}), 400
+
+    existing = Participant.query.filter_by(
+        tournament_id=t.id,
+        knight_id=current_user.id
+    ).first()
+    if existing:
+        return jsonify({"error": "You have already joined this tournament"}), 409
+
+    participant = Participant(
+        tournament_id=t.id,
+        knight_id=current_user.id,
+    )
+    db.session.add(participant)
+    db.session.commit()
+
+    return jsonify({"message": "Successfully joined the tournament"}), 201

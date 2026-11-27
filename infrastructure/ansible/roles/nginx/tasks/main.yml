@@ -1,0 +1,52 @@
+---
+- name: Install Nginx and core packages
+  ansible.builtin.apt:
+    name:
+       - nginx
+       - curl
+       - iptables
+       - iptables-persistent
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Generate Nginx configuration
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: "/etc/nginx/sites-available/{{ nginx_site_name }}"
+    group: root
+    owner: root
+    mode: '0644'
+  notify: Reload Nginx
+
+- name: Remove default config from nginx/sites-enabled
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Reload Nginx
+
+- name: Create soft link for sites-enabled/the-great-books
+  ansible.builtin.file:
+    src: "/etc/nginx/sites-available/{{ nginx_site_name }}"
+    dest: "/etc/nginx/sites-enabled/{{ nginx_site_name }}"
+    state: link
+  notify: Reload Nginx
+
+- name: Check nginx configuration
+  ansible.builtin.command: nginx -t
+  changed_when: false
+
+- name: Enable and start Nginx
+  ansible.builtin.systemd:
+    name: nginx
+    enabled: true
+    state: started
+
+- name: Allow http traffic
+  ansible.builtin.iptables:
+    chain: INPUT
+    protocol: tcp
+    destination_port: "{{ nginx_listen_port }}"
+    jump: ACCEPT
+    state: present
+  notify: Save firewall rules

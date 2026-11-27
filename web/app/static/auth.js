@@ -14,11 +14,12 @@ async function handleLogin(e) {
     e.preventDefault();
     const username = document.getElementById("login-username").value;
     const password = document.getElementById("login-password").value;
+    const remember_me = document.getElementById("login-remember-me").checked;
 
     try {
         const res = await apiFetch("/auth/login", {
             method: "POST",
-            body: JSON.stringify({ username, password })
+            body: JSON.stringify({ username, password, remember_me })
         });
         await checkAuth();
         if (res.redirect_url) {

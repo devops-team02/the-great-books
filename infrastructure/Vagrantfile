@@ -11,6 +11,26 @@ File.readlines("../.env").each do |line|
   ENV[key] = value.gsub(/\A['"]|['"]\z/, "") if key && value
 end
 
+def provision_ansible_access(vm)
+  vm.vm.provision "file",
+    source: "./ssh-keys/ansible_key.pub",
+    destination: "/tmp/ansible_key.pub"
+
+  vm.vm.provision "shell", inline: <<-SHELL
+    mkdir -p /home/vagrant/.ssh
+    touch /home/vagrant/.ssh/authorized_keys
+    
+    grep -qxF "$(cat /tmp/ansible_key.pub)" /home/vagrant/.ssh/authorized_keys || \
+      cat /tmp/ansible_key.pub >> /home/vagrant/.ssh/authorized_keys
+
+    chown -R vagrant:vagrant /home/vagrant/.ssh
+    chmod 700 /home/vagrant/.ssh
+    chmod 600 /home/vagrant/.ssh/authorized_keys
+
+    rm -f /tmp/ansible_key.pub
+  SHELL
+end
+
 Vagrant.configure("2") do |config|
   config.vm.box = "ubuntu/jammy64"
 
@@ -19,24 +39,36 @@ Vagrant.configure("2") do |config|
 
   config.vm.provision "shell", path: "scripts/configure_ssh.sh",env: { "SSH_PUB_KEY" => ENV["SSH_PUB_KEY"] }
 
-  config.vm.define "DB" do |app|
-    app.vm.hostname = "db"
-    app.vm.network "private_network", ip: "192.168.56.4"
+  # 1. CI-CD (Ansible Control Node & Jenkins)
+  config.vm.define "CI-CD" do |app|
+    app.vm.hostname = "ci-cd"
+    app.vm.network "private_network", ip: "192.168.56.6"
+    app.vm.network "forwarded_port",
+      guest: 8080,
+      host: 8081,
+      host_ip: "127.0.0.1"
 
     app.vm.provider "virtualbox" do |vb|
-      vb.name = "Vagrant-DB"
-      vb.cpus = 1
-      vb.memory = 1024
+      vb.name = "Vagrant-CI-CD"
+      vb.cpus = 2
+      vb.memory = 2048
       vb.linked_clone = true
     end
-
+    # Provision private SSH key for Ansible
     app.vm.provision "file",
-      source: "../.env",
-      destination: "/tmp/.env"
-
-    app.vm.provision "shell", path: "scripts/init_db.sh"
+      source: "./ssh-keys/ansible_key",
+      destination: "/home/vagrant/.ssh/ansible_key"
+    app.vm.provision "shell", inline: <<-SHELL
+      chown vagrant:vagrant /home/vagrant/.ssh/ansible_key
+      chmod 600 /home/vagrant/.ssh/ansible_key
+      SHELL
+    app.vm.provision "shell", path: "scripts/init_cicd.sh"
+    app.vm.provision "file",
+      source: "./ansible",
+      destination: "/home/vagrant/ansible"
   end
 
+  # 2. Consul Server (Configured via Ansible role)
   config.vm.define "Consul" do |app|
     app.vm.hostname = "consul"
     app.vm.network "private_network", ip: "192.168.56.5"
@@ -47,14 +79,95 @@ Vagrant.configure("2") do |config|
       vb.memory = 512
       vb.linked_clone = true
     end
-
-    app.vm.provision "file",
-      source: "consul/consul.hcl",
-      destination: "/tmp/consul.hcl"
-
-    app.vm.provision "shell", path: "consul/install.sh"
+    provision_ansible_access(app)
   end
 
+  # 3. Database Server
+  config.vm.define "DB" do |app|
+    app.vm.hostname = "db"
+    app.vm.network "private_network", ip: "192.168.56.4"
+
+    app.vm.provider "virtualbox" do |vb|
+      vb.name = "Vagrant-DB"
+      vb.cpus = 1
+      vb.memory = 1024
+      vb.linked_clone = true
+    end
+    provision_ansible_access(app)
+
+    app.vm.provision "file",
+      source: "../.env",
+      destination: "/tmp/.env"
+
+    app.vm.provision "file",
+      source: "consul/service-db.json",
+      destination: "/tmp/service-db.json"
+
+    app.vm.provision "shell", path: "scripts/install_consul_client.sh"
+    app.vm.provision "shell", path: "scripts/init_db.sh"
+  end
+
+  # 4. Application Servers
+  config.vm.define "app1" do |app|
+    app.vm.hostname = "app1"
+    app.vm.network "private_network", ip: "192.168.56.2"
+
+    app.vm.provider "virtualbox" do |vb|
+      vb.name = "Vagrant-app1"
+      vb.cpus = 1
+      vb.memory = 1024
+      vb.linked_clone = true
+    end
+    provision_ansible_access(app)
+
+    app.vm.provision "file",
+      source: "../web/",
+      destination: "/tmp/web"
+
+    app.vm.provision "file",
+      source: "../.env",
+      destination: "/tmp/.env"
+
+    app.vm.provision "file",
+      source: "consul/service-web.json",
+      destination: "/tmp/service-web.json"
+
+    app.vm.provision "shell", path: "scripts/install_consul_client.sh"
+    app.vm.provision "shell", path: "scripts/init_web.sh"
+    app.vm.provision "shell", path: "scripts/setup_nfs_client.sh"
+  end
+
+  config.vm.define "app2" do |app|
+    app.vm.hostname = "app2"
+    app.vm.network "private_network", ip: "192.168.56.3"
+
+    app.vm.provider "virtualbox" do |vb|
+      vb.name = "Vagrant-app2"
+      vb.cpus = 1
+      vb.memory = 1024
+      vb.linked_clone = true
+    end
+    provision_ansible_access(app)
+
+    app.vm.provision "file",
+      source: "../web/",
+      destination: "/tmp/web"
+
+    app.vm.provision "file",
+      source: "../.env",
+      destination: "/tmp/.env"
+
+    app.vm.provision "file",
+      source: "consul/service-web.json",
+      destination: "/tmp/service-web.json"
+
+    app.vm.provision "shell", path: "scripts/install_consul_client.sh"
+    app.vm.provision "shell", path: "scripts/configure_consul_resolver.sh"
+    app.vm.provision "shell", path: "scripts/init_web.sh"
+    app.vm.provision "shell", path: "scripts/setup_nfs_client.sh"
+  end
+
+  # 5. Load Balancer & NFS Server
   config.vm.define "LB" do |app|
     app.vm.hostname = "lb"
     app.vm.network "private_network", ip: "192.168.56.10"
@@ -70,55 +183,19 @@ Vagrant.configure("2") do |config|
       vb.memory = 512
       vb.linked_clone = true
     end
+    provision_ansible_access(app)
 
+    app.vm.provision "file",
+      source: "consul/nginx.conf.ctmpl",
+      destination: "/tmp/nginx.conf.ctmpl"
+
+    app.vm.provision "file",
+      source: "consul/service-lb.json",
+      destination: "/tmp/services.json"
+
+    app.vm.provision "shell", path: "scripts/install_consul_client.sh"
     app.vm.provision "shell", path: "scripts/init_nginx_lb.sh"
     app.vm.provision "shell", path: "scripts/setup_nfs_server.sh"
-  end
-
-  config.vm.define "app1" do |app|
-    app.vm.hostname = "app1"
-    app.vm.network "private_network", ip: "192.168.56.2"
-
-    app.vm.provider "virtualbox" do |vb|
-      vb.name = "Vagrant-app1"
-      vb.cpus = 1
-      vb.memory = 1024
-      vb.linked_clone = true
-    end
-
-    app.vm.provision "file",
-      source: "../web/",
-      destination: "/tmp/web"
-
-    app.vm.provision "file",
-      source: "../.env",
-      destination: "/tmp/.env"
-
-    app.vm.provision "shell", path: "scripts/init_web.sh"
-    app.vm.provision "shell", path: "scripts/setup_nfs_client.sh"
-  end
-
-  config.vm.define "app2" do |app|
-    app.vm.hostname = "app2"
-    app.vm.network "private_network", ip: "192.168.56.3"
-
-    app.vm.provider "virtualbox" do |vb|
-      vb.name = "Vagrant-app2"
-      vb.cpus = 1
-      vb.memory = 1024
-      vb.linked_clone = true
-    end
-
-    app.vm.provision "file",
-      source: "../web/",
-      destination: "/tmp/web"
-
-    app.vm.provision "file",
-      source: "../.env",
-      destination: "/tmp/.env"
-
-    app.vm.provision "shell", path: "scripts/init_web.sh"
-    app.vm.provision "shell", path: "scripts/setup_nfs_client.sh"
   end
 
   # uncomment for prod (removing vagrant user)

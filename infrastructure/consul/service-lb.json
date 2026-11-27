@@ -1,0 +1,28 @@
+{
+  "services": [
+    {
+      "name": "load-balancer",
+      "id": "load-balancer",
+      "tags": ["load-balancer", "nginx"],
+      "port": 80,
+      "check": {
+        "tcp": "127.0.0.1:80",
+        "interval": "10s",
+        "timeout": "2s",
+        "deregister_critical_service_after": "1m"
+      }
+    },
+    {
+      "name": "nfs-server",
+      "id": "nfs-server",
+      "tags": ["storage", "nfs"],
+      "port": 2049,
+      "check": {
+        "tcp": "127.0.0.1:2049",
+        "interval": "10s",
+        "timeout": "2s",
+        "deregister_critical_service_after": "1m"
+      }
+    }
+  ]
+}

@@ -32,6 +32,12 @@ def _seed_initial_data():
         db.session.commit()
 
     if House.query.count() == 0:
-        for house_name in ["Stark", "Lannister", "Targaryen", "Baratheon"]:
-            db.session.add(House(name=house_name))
+        houses_data = [
+            ("Stark", "Winter is Coming"),
+            ("Lannister", "Hear Me Roar!"),
+            ("Targaryen", "Fire and Blood"),
+            ("Baratheon", "Ours is the Fury"),
+        ]
+        for house_name, house_motto in houses_data:
+            db.session.add(House(name=house_name, motto=house_motto))
         db.session.commit()

@@ -1,4 +1,4 @@
-name: Auto-fill Shortcut Task in PR
+name: Auto-fill Jira Task in PR
 
 on:
   pull_request:
@@ -19,12 +19,12 @@ jobs:
             const match = branch.match(/^(SC-\d+)/i);
 
             if (!match) {
-              console.log(`No Shortcut ID found in branch name: "${branch}". Skipping.`);
+              console.log(`No Jira ID found in branch name: "${branch}". Skipping.`);
               return;
             }
 
             const taskId = match[1].toUpperCase();
-            const link = `https://app.shortcut.com/devops-team02/story/${taskId}`;
+            const link = `https://drobko-bohdan.atlassian.net/browse/${taskId}`;
             let body = context.payload.pull_request.body || '';
 
             body = body
@@ -33,7 +33,7 @@ jobs:
                 `**Task ID:** ${taskId}`
               )
               .replace(
-                /\[SC-___\]\(https:\/\/app\.shortcut\.com\/devops-team02\/story\/SC-___\)/g,
+                /\[SC-___\]\(https:\/\/(drobko-bohdan\.atlassian\.net\/browse|app\.shortcut\.com\/devops-team02\/story)\/SC-___\)/g,
                 `[${taskId}](${link})`
               );
 

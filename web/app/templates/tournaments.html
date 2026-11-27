@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Tournaments — The Great Books{% endblock %}
+
+{% block content %}
+<section class="page">
+    <div class="page-header">
+        <div>
+            <h1>Royal Tournaments</h1>
+            <p class="subtitle">Active and upcoming jousts across the Kingdoms</p>
+        </div>
+        <button id="btn-open-create-tournament" class="btn-primary hidden" onclick="openCreateTournamentModal()">
+            + Create Tournament
+        </button>
+    </div>
+
+    <div id="tournaments-grid" class="cards-grid"></div>
+</section>
+
+<div id="create-tournament-modal" class="modal-backdrop hidden" onclick="handleTournamentModalBackdrop(event)">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>Host a Tournament</h3>
+            <button type="button" class="modal-close" onclick="closeCreateTournamentModal()">&times;</button>
+        </div>
+        <form id="create-tournament-form" class="auth-form" onsubmit="handleCreateTournament(event)">
+            <label>Tournament Title / Date Label
+                <input type="text" id="tourn-date-label" maxlength="30" required>
+            </label>
+
+            <label>Max Participants
+                <input type="number" id="tourn-max-participants" min="1" value="16" required>
+            </label>
+
+            <label>Registration Closes / Start Date
+                <input type="datetime-local" id="tourn-start-date" required>
+            </label>
+
+            <label>End Date
+                <input type="datetime-local" id="tourn-end-date" required>
+            </label>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeCreateTournamentModal()">Cancel</button>
+                <button type="submit" id="btn-submit-tournament" class="btn-primary"
+                    style="margin-top: 0;">Create</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='tournaments.js') }}"></script>
+{% endblock %}

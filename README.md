@@ -4,15 +4,34 @@
 
 - `web/` - Flask REST API application and static files
 - `infrastructure/` - Vagrant configuration, Consul, and VM setup scripts
-
+---
 # SETUP GUIDE
 
 ## Prerequisites:
 
 - VirtualBox: https://www.virtualbox.org/wiki/Downloads
 - Vagrant: https://developer.hashicorp.com/vagrant/install
+- GitLeaks: *Install guide below*
 
-### Environment Setup
+## Environment Setup
+
+---
+### **IMPORTANT!!!** 
+For local development, ensure you have installed and activated GitLeaks:
+
+
+```shell
+pip install pre-commit # for linux/Windows
+```
+```shell
+brew install pre-commit # for macOS
+```
+And activate it using the following command in the root directory of the project:
+```
+pre-commit install
+```
+---
+
 Before starting the infrastructure or running the app locally, create a `.env` file in the root directory from the template:
 ```shell
 cp .env.example .env
@@ -26,13 +45,14 @@ vagrant up
 
 from directory where <u>*the **Vagrantfile***</u> is (`infrastructure/`)
 
+---
 ## Accessing the Web Application:
 
 Once all VMs are provisioned and running, access the web application through the Nginx Load Balancer:
 
 - **Browser (Local Host)**: [http://localhost:8080](http://localhost:8080) (forwarded from the `LB` VM's port `80`)
 - **Direct LB IP**: `http://192.168.56.10` (accessible from host or internal private network)
-
+---
 ## Connect via SSH:
 
 Access is secured via SSH key authentication.
@@ -55,7 +75,7 @@ SSH_PUB_KEY="ssh-ed25519 AAAAC3... your_key_comment"
 ```shell
 ssh deploy@<vm_ip>   # e.g., ssh deploy@192.168.56.2
 ```
-
+---
 # Vagrant VMs
 
 ## VMs specifications:
@@ -88,8 +108,8 @@ ip: 192.168.56.4
 
 ip: 192.168.56.5
 
+---
 # Database Structure
-
 ### *After changing the model run this (from /web/ folder):* 
 
 ```bash
@@ -135,6 +155,7 @@ flask db upgrade # to apply the changes to the database
 - expires_at - timestamp, not null
 - created_at - timestamp
 - ip_address - varchar(15)
+- remember_me - boolean
 
 # Web Interface (UI Pages)
 
@@ -176,7 +197,7 @@ The application provides a server-rendered web interface with authentication gua
   - Body (JSON): `username` (string, required), `password` (string, required), `role_id` (int, required), `house_id` (int, optional)
   - Success (201): sets `token` cookie and returns user info
 - `POST /api/auth/login` - authenticate user and start a session
-  - Body (JSON): `username` (string, required), `password` (string, required)
+  - Body (JSON): `username` (string, required), `password` (string, required), `remember_me` (boolean, optional)
   - Success (200): sets `token` cookie and returns user info
 - `POST /api/auth/logout` - invalidate session and clear cookie
   - Header/Cookie: `token=<token>`

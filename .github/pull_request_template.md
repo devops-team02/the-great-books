@@ -1,7 +1,7 @@
 ## Shortcut Task
 
 **Task ID:** SC-___
-**Link:** [SC-___](https://app.shortcut.com/devops-team02/story/SC-___)
+**Link:** [SC-___](https://drobko-bohdan.atlassian.net/browse/SC-)
 
 ---
 

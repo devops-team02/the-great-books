@@ -1,0 +1,11 @@
+title = "Gitleaks Config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Ignore .env.example and README.md files"
+paths = [
+  '''\.env\.example$''',
+  '''README\.md$'''
+]
