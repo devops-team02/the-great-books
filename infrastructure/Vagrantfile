@@ -51,8 +51,8 @@ Vagrant.configure("2") do |config|
 
     app.vm.provider "virtualbox" do |vb|
       vb.name = "Vagrant-CI-CD"
-      vb.cpus = 2
-      vb.memory = 2048
+      vb.cpus = 4
+      vb.memory = 4096
       vb.linked_clone = true
     end
     # Provision private SSH key and .env for Ansible and Jenkins

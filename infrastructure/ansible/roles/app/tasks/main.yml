@@ -45,7 +45,7 @@
 
 - name: Synchronize web application files
   ansible.builtin.synchronize:
-    src: "{{ web_src_dir | default(playbook_dir + '/../web/') }}"
+    src: "{{ web_src_dir | default(playbook_dir + '/../../web/') }}"
     dest: "{{ app_dir }}/"
     delete: false
     rsync_opts:
