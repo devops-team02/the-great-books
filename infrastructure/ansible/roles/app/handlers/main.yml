@@ -1,0 +1,18 @@
+---
+- name: Reload Nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: reloaded
+
+- name: Restart Web Service
+  ansible.builtin.systemd:
+    name: web
+    state: restarted
+
+- name: Restart resolved
+  ansible.builtin.systemd:
+    name: systemd-resolved
+    state: restarted
+
+- name: Save firewall rules
+  ansible.builtin.command: netfilter-persistent save

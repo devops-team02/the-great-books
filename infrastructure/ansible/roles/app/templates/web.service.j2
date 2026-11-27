@@ -1,0 +1,15 @@
+[Unit]
+Description=Flask Backend (Great Books)
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory={{ app_dir }}
+EnvironmentFile={{ app_dir }}/.env
+ExecStart={{ app_dir }}/venv/bin/gunicorn -w 2 -b 127.0.0.1:5000 run:app
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

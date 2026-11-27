@@ -36,8 +36,9 @@ Vagrant.configure("2") do |config|
 
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.provision "shell", path: "scripts/init_firewall.sh"
-
   config.vm.provision "shell", path: "scripts/configure_ssh.sh",env: { "SSH_PUB_KEY" => ENV["SSH_PUB_KEY"] }
+
+  config.vm.boot_timeout = 600
 
   # 1. CI-CD (Ansible Control Node & Jenkins)
   config.vm.define "CI-CD" do |app|
@@ -54,18 +55,35 @@ Vagrant.configure("2") do |config|
       vb.memory = 2048
       vb.linked_clone = true
     end
-    # Provision private SSH key for Ansible
+    # Provision private SSH key and .env for Ansible and Jenkins
     app.vm.provision "file",
       source: "./ssh-keys/ansible_key",
-      destination: "/home/vagrant/.ssh/ansible_key"
+      destination: "/tmp/ansible_key"
+    app.vm.provision "file",
+      source: "../.env",
+      destination: "/tmp/.env"
+    app.vm.provision "shell", path: "scripts/init_cicd.sh"
     app.vm.provision "shell", inline: <<-SHELL
+      mkdir -p /home/vagrant/.ssh
+      cp /tmp/ansible_key /home/vagrant/.ssh/ansible_key
       chown vagrant:vagrant /home/vagrant/.ssh/ansible_key
       chmod 600 /home/vagrant/.ssh/ansible_key
-      SHELL
-    app.vm.provision "shell", path: "scripts/init_cicd.sh"
+
+      mkdir -p /var/lib/jenkins/.ssh /var/lib/jenkins/secrets
+      cp /tmp/ansible_key /var/lib/jenkins/.ssh/ansible_key
+      cp /tmp/.env /var/lib/jenkins/secrets/.env
+      chown -R jenkins:jenkins /var/lib/jenkins/.ssh /var/lib/jenkins/secrets
+      chmod 700 /var/lib/jenkins/.ssh
+      chmod 600 /var/lib/jenkins/.ssh/ansible_key /var/lib/jenkins/secrets/.env
+
+      rm -f /tmp/ansible_key /tmp/.env
+    SHELL
     app.vm.provision "file",
       source: "./ansible",
       destination: "/home/vagrant/ansible"
+    app.vm.provision "file",
+      source: "./jenkins",
+      destination: "/home/vagrant/jenkins"
   end
 
   # 2. Consul Server (Configured via Ansible role)
@@ -121,19 +139,11 @@ Vagrant.configure("2") do |config|
     provision_ansible_access(app)
 
     app.vm.provision "file",
-      source: "../web/",
-      destination: "/tmp/web"
-
-    app.vm.provision "file",
-      source: "../.env",
-      destination: "/tmp/.env"
-
-    app.vm.provision "file",
       source: "consul/service-web.json",
       destination: "/tmp/service-web.json"
 
     app.vm.provision "shell", path: "scripts/install_consul_client.sh"
-    app.vm.provision "shell", path: "scripts/init_web.sh"
+    app.vm.provision "shell", path: "scripts/configure_consul_resolver.sh"
     app.vm.provision "shell", path: "scripts/setup_nfs_client.sh"
   end
 
@@ -163,7 +173,6 @@ Vagrant.configure("2") do |config|
 
     app.vm.provision "shell", path: "scripts/install_consul_client.sh"
     app.vm.provision "shell", path: "scripts/configure_consul_resolver.sh"
-    app.vm.provision "shell", path: "scripts/init_web.sh"
     app.vm.provision "shell", path: "scripts/setup_nfs_client.sh"
   end
 

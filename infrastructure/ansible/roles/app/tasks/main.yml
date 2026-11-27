@@ -1,0 +1,169 @@
+---
+- name: Install Nginx, Python, and required system packages
+  ansible.builtin.apt:
+    name:
+      - nginx
+      - curl
+      - iptables
+      - iptables-persistent
+      - python3
+      - python3-pip
+      - python3-venv
+      - libpq-dev
+      - rsync
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure systemd-resolved consul configuration directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/resolved.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Configure Consul DNS for systemd-resolved
+  ansible.builtin.copy:
+    dest: /etc/systemd/resolved.conf.d/consul.conf
+    content: |
+      [Resolve]
+      DNS=127.0.0.1:8600
+      Domains=~consul
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart resolved
+
+- name: Ensure application directory exists
+  ansible.builtin.file:
+    path: "{{ app_dir }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: '0755'
+
+- name: Synchronize web application files
+  ansible.builtin.synchronize:
+    src: "{{ web_src_dir | default(playbook_dir + '/../web/') }}"
+    dest: "{{ app_dir }}/"
+    delete: false
+    rsync_opts:
+      - "--exclude=.git"
+      - "--exclude=__pycache__"
+      - "--exclude=*.pyc"
+      - "--exclude=.pytest_cache"
+
+- name: Install requirements into virtualenv
+  ansible.builtin.pip:
+    requirements: "{{ app_dir }}/requirements.txt"
+    virtualenv: "{{ app_dir }}/venv"
+    virtualenv_command: /usr/bin/python3 -m venv
+    extra_args: "--upgrade pip"
+
+- name: Install Gunicorn in virtualenv
+  ansible.builtin.pip:
+    name: gunicorn
+    virtualenv: "{{ app_dir }}/venv"
+
+# 5. Налаштування .env та конфігурації БД
+- name: Copy base .env file
+  ansible.builtin.copy:
+    src: "{{ env_file_path | default(playbook_dir + '/../../.env') }}"
+    dest: "{{ app_dir }}/.env"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: '0600'
+  notify: Restart Web Service
+
+- name: Ensure DATABASE_URI is present in .env
+  ansible.builtin.lineinfile:
+    path: "{{ app_dir }}/.env"
+    line: "DATABASE_URI=postgresql+psycopg2://{{ db_user }}:{{ db_pass }}@{{ db_host }}:{{ db_port }}/{{ db_name }}"
+    regexp: '^DATABASE_URI='
+    state: present
+  notify: Restart Web Service
+
+- name: Ensure permissions on application directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    recurse: true
+
+- name: Wait for Database to become reachable
+  ansible.builtin.wait_for:
+    host: "{{ db_host }}"
+    port: "{{ db_port }}"
+    timeout: 60
+    state: started
+  when: inventory_hostname == 'app1'
+
+- name: Run database migrations and seed DB (only on app1)
+  ansible.builtin.command:
+    cmd: "{{ app_dir }}/venv/bin/flask {{ item }}"
+    chdir: "{{ app_dir }}"
+  environment:
+    FLASK_APP: "run.py"
+  loop:
+    - "db upgrade heads"
+    - "seed-db"
+  when: inventory_hostname == 'app1'
+
+- name: Configure systemd service for web application
+  ansible.builtin.template:
+    src: web.service.j2
+    dest: /etc/systemd/system/web.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Web Service
+
+- name: Enable and start web service
+  ansible.builtin.systemd:
+    name: web
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Copy Nginx site configuration
+  ansible.builtin.copy:
+    src: nginx.conf
+    dest: /etc/nginx/sites-available/app
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload Nginx
+
+- name: Remove default Nginx site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Reload Nginx
+
+- name: Enable Nginx app site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/app
+    dest: /etc/nginx/sites-enabled/app
+    state: link
+  notify: Reload Nginx
+
+- name: Test Nginx configuration
+  ansible.builtin.command: nginx -t
+  changed_when: false
+
+- name: Ensure Nginx is running and enabled
+  ansible.builtin.systemd:
+    name: nginx
+    enabled: true
+    state: started
+
+- name: Allow HTTP traffic from Load Balancer
+  ansible.builtin.iptables:
+    chain: INPUT
+    protocol: tcp
+    source: "{{ load_balancer_ip }}"
+    destination_port: "80"
+    jump: ACCEPT
+    state: present
+  notify: Save firewall rules

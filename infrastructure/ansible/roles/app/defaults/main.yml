@@ -1,0 +1,10 @@
+---
+app_dir: "/opt/web"
+app_user: "www-data"
+app_group: "www-data"
+db_host: "postgres.service.consul"
+db_port: 5432
+db_name: "books"
+db_user: "postgres"
+db_pass: "12345678"
+load_balancer_ip: "192.168.56.10"

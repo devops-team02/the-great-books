@@ -11,8 +11,15 @@
   roles:
   - consul
 
+- name: Configure Application server
+  hosts: application_servers
+  become: true
+  roles:
+  - app
+
 - name: Configure Nginx load balancer
   hosts: load_balancers
   become: true
   roles:
   - nginx
+
