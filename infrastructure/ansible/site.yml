@@ -1,6 +1,6 @@
 ---
 - name: Install common packages on all hosts
-  hosts: all
+  hosts: "all:!control_nodes"
   become: true
   roles:
   - common
