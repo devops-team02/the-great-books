@@ -6,3 +6,5 @@ nginx_max_fails: 3
 nginx_fail_timeout: 10s
 nginx_proxy_connect_timeout: 5s
 nginx_proxy_read_timeout: 30s
+nfs_server_export_dir: "/media/pictures"
+nfs_allowed_network: "192.168.56.0/24"

@@ -6,9 +6,35 @@
        - curl
        - iptables
        - iptables-persistent
+       - nfs-kernel-server
     state: present
     update_cache: true
     cache_valid_time: 3600
+
+- name: Ensure NFS export directory exists
+  ansible.builtin.file:
+    path: "{{ nfs_server_export_dir }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: "0755"
+
+- name: Configure NFS export
+  ansible.builtin.lineinfile:
+    path: /etc/exports
+    regexp: "^{{ nfs_server_export_dir | regex_escape }}\\s"
+    line: "{{ nfs_server_export_dir }} {{ nfs_allowed_network }}(rw,sync,no_subtree_check)"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload NFS exports
+
+- name: Enable and start NFS server
+  ansible.builtin.systemd:
+    name: nfs-kernel-server
+    enabled: true
+    state: started
 
 - name: Generate Nginx configuration
   ansible.builtin.template:

@@ -1,0 +1,1 @@
+ssh_env_file_path: "{{ env_file_path | default(playbook_dir + '/../../.env') }}"

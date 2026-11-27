@@ -4,13 +4,6 @@
 ENV_FILE = File.expand_path("../.env", __dir__)
 abort("ERROR: .env file not found! Run 'cp .env.example .env' in the repo root first.") unless File.exist?(ENV_FILE)
 
-File.readlines("../.env").each do |line|
-  line = line.strip
-  next if line.empty? || line.start_with?("#")
-  key, value = line.split("=", 2)
-  ENV[key] = value.gsub(/\A['"]|['"]\z/, "") if key && value
-end
-
 def provision_ansible_access(vm)
   vm.vm.provision "file",
     source: "./ssh-keys/ansible_key.pub",
@@ -35,8 +28,6 @@ Vagrant.configure("2") do |config|
   config.vm.box = "ubuntu/jammy64"
 
   config.vm.synced_folder ".", "/vagrant", disabled: true
-  config.vm.provision "shell", path: "scripts/init_firewall.sh"
-  config.vm.provision "shell", path: "scripts/configure_ssh.sh",env: { "SSH_PUB_KEY" => ENV["SSH_PUB_KEY"] }
 
   config.vm.boot_timeout = 600
 
@@ -55,6 +46,7 @@ Vagrant.configure("2") do |config|
       vb.memory = 4096
       vb.linked_clone = true
     end
+    provision_ansible_access(app)
     # Provision private SSH key and .env for Ansible and Jenkins
     app.vm.provision "file",
       source: "./ssh-keys/ansible_key",
@@ -144,7 +136,6 @@ Vagrant.configure("2") do |config|
 
     app.vm.provision "shell", path: "scripts/install_consul_client.sh"
     app.vm.provision "shell", path: "scripts/configure_consul_resolver.sh"
-    app.vm.provision "shell", path: "scripts/setup_nfs_client.sh"
   end
 
   config.vm.define "app2" do |app|
@@ -173,7 +164,6 @@ Vagrant.configure("2") do |config|
 
     app.vm.provision "shell", path: "scripts/install_consul_client.sh"
     app.vm.provision "shell", path: "scripts/configure_consul_resolver.sh"
-    app.vm.provision "shell", path: "scripts/setup_nfs_client.sh"
   end
 
   # 5. Load Balancer & NFS Server
@@ -195,18 +185,10 @@ Vagrant.configure("2") do |config|
     provision_ansible_access(app)
 
     app.vm.provision "file",
-      source: "consul/nginx.conf.ctmpl",
-      destination: "/tmp/nginx.conf.ctmpl"
-
-    app.vm.provision "file",
       source: "consul/service-lb.json",
       destination: "/tmp/services.json"
 
     app.vm.provision "shell", path: "scripts/install_consul_client.sh"
-    app.vm.provision "shell", path: "scripts/init_nginx_lb.sh"
-    app.vm.provision "shell", path: "scripts/setup_nfs_server.sh"
   end
 
-  # uncomment for prod (removing vagrant user)
-  # config.vm.provision "shell", path: "scripts/cleanup_vagrant.sh"
 end

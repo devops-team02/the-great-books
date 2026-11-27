@@ -6,3 +6,6 @@
 
 - name: Save firewall rules
   ansible.builtin.command: netfilter-persistent save
+
+- name: Reload NFS exports
+  ansible.builtin.command: exportfs -ra

@@ -11,3 +11,138 @@
     state: present
     update_cache: true
     cache_valid_time: 3600
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+
+- name: Check UFW status
+  ansible.builtin.command: ufw status
+  register: ufw_status
+  changed_when: false
+  failed_when: false
+
+- name: Disable UFW when active
+  ansible.builtin.command: ufw disable
+  when:
+    - ufw_status.rc == 0
+    - "'Status: active' in ufw_status.stdout"
+
+- name: Ensure base firewall rules are present
+  ansible.builtin.iptables:
+    chain: INPUT
+    in_interface: "{{ item.in_interface | default(omit) }}"
+    ctstate: "{{ item.ctstate | default(omit) }}"
+    protocol: "{{ item.protocol | default(omit) }}"
+    icmp_type: "{{ item.icmp_type | default(omit) }}"
+    source: "{{ item.source | default(omit) }}"
+    destination_port: "{{ item.destination_port | default(omit) }}"
+    jump: ACCEPT
+    comment: "{{ item.comment }}"
+    state: present
+  loop:
+    - { in_interface: "lo", comment: "Allow loopback traffic" }
+    - { ctstate: ["ESTABLISHED", "RELATED"], comment: "Allow established traffic" }
+    - { protocol: "icmp", icmp_type: "echo-request", source: "192.168.56.0/24", comment: "Allow internal ping" }
+    - { protocol: "tcp", source: "192.168.56.0/24", destination_port: "2049", comment: "Allow internal NFS" }
+    - { protocol: "tcp", destination_port: "22", comment: "Allow SSH" }
+  notify: Save firewall rules
+
+- name: Allow Jenkins web traffic on control nodes
+  ansible.builtin.iptables:
+    chain: INPUT
+    protocol: tcp
+    destination_port: "8080"
+    jump: ACCEPT
+    comment: "Allow Jenkins web interface"
+    state: present
+  when: inventory_hostname in groups['control_nodes']
+  notify: Save firewall rules
+
+- name: Set firewall default policies
+  ansible.builtin.iptables:
+    chain: "{{ item }}"
+    policy: DROP
+  loop:
+    - INPUT
+    - FORWARD
+  notify: Save firewall rules
+
+- name: Ensure SSH hardening configuration directory exists
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Configure SSH hardening
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/99-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+      PermitEmptyPasswords no
+      ChallengeResponseAuthentication no
+      KbdInteractiveAuthentication no
+      PubkeyAuthentication yes
+      MaxAuthTries 3
+      LoginGraceTime 30
+      ClientAliveInterval 300
+      ClientAliveCountMax 2
+      X11Forwarding no
+      AllowAgentForwarding no
+      AllowTcpForwarding no
+  notify: Reload SSH
+
+- name: Validate SSH configuration
+  ansible.builtin.command: sshd -t
+  changed_when: false
+
+- name: Load deploy public key from environment file
+  ansible.builtin.set_fact:
+    deploy_public_key: >-
+      {{ lookup('ansible.builtin.ini', 'SSH_PUB_KEY type=properties file=' ~ ssh_env_file_path)
+         | trim | regex_replace('^"|"$', '') }}
+  no_log: true
+
+- name: Create deploy user
+  ansible.builtin.user:
+    name: deploy
+    groups: sudo
+    append: true
+    shell: /bin/bash
+    create_home: true
+    state: present
+  when: deploy_public_key is match('^(ssh-(rsa|ed25519)|ecdsa-sha2-[^ ]+) [^ ]+')
+
+- name: Grant passwordless sudo to deploy user
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/99-deploy-user
+    content: "deploy ALL=(ALL) NOPASSWD:ALL\n"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"
+  when: deploy_public_key is match('^(ssh-(rsa|ed25519)|ecdsa-sha2-[^ ]+) [^ ]+')
+
+- name: Ensure deploy SSH directory exists
+  ansible.builtin.file:
+    path: /home/deploy/.ssh
+    state: directory
+    owner: deploy
+    group: deploy
+    mode: "0700"
+  when: deploy_public_key is match('^(ssh-(rsa|ed25519)|ecdsa-sha2-[^ ]+) [^ ]+')
+
+- name: Add deploy public key
+  ansible.builtin.lineinfile:
+    path: /home/deploy/.ssh/authorized_keys
+    line: "{{ deploy_public_key }}"
+    create: true
+    owner: deploy
+    group: deploy
+    mode: "0600"
+  no_log: true
+  when: deploy_public_key is match('^(ssh-(rsa|ed25519)|ecdsa-sha2-[^ ]+) [^ ]+')

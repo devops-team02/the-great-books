@@ -21,7 +21,6 @@ pipeline {
                     cd infrastructure/ansible
                     ansible-playbook site.yml \
                         -i inventory/hosts.yml \
-                        --limit application_servers \
                         -e "env_file_path=${ENV_FILE}" \
                         --private-key "${ANSIBLE_KEY}" \
                         -v

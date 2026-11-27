@@ -11,6 +11,7 @@
       - python3-venv
       - libpq-dev
       - rsync
+      - nfs-common
     state: present
     update_cache: true
     cache_valid_time: 3600
@@ -90,6 +91,38 @@
     owner: "{{ app_user }}"
     group: "{{ app_group }}"
     recurse: true
+
+- name: Ensure NFS mount directory exists
+  ansible.builtin.file:
+    path: "{{ nfs_client_mount_dir }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0755"
+
+- name: Configure persistent NFS mount
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: "^\\S+:{{ nfs_server_export_dir | regex_escape }}\\s+{{ nfs_client_mount_dir | regex_escape }}\\s+nfs\\s"
+    line: "{{ nfs_server_address }}:{{ nfs_server_export_dir }} {{ nfs_client_mount_dir }} nfs defaults,_netdev 0 0"
+    state: present
+
+- name: Check whether NFS mount is active
+  ansible.builtin.command: "mountpoint -q {{ nfs_client_mount_dir }}"
+  register: nfs_mount_status
+  changed_when: false
+  failed_when: false
+
+- name: Wait for NFS server to become available
+  ansible.builtin.wait_for:
+    host: "{{ nfs_server_address }}"
+    port: 2049
+    timeout: 60
+  when: nfs_mount_status.rc != 0
+
+- name: Mount NFS share
+  ansible.builtin.command: "mount {{ nfs_client_mount_dir }}"
+  when: nfs_mount_status.rc != 0
 
 - name: Wait for Database to become reachable
   ansible.builtin.wait_for:
