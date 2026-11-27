@@ -16,10 +16,11 @@ rm -f /tmp/.env
 : "${DB_USER:?DB_USER is required in .env}"
 : "${DB_PASS:?DB_PASS is required in .env}"
 
-ALLOWED_IPS=("192.168.56.2/32" "192.168.56.3/32")
+ALLOWED_NETWORK="192.168.56.0/24"
 
-echo "Встановлення PostgreSQL..."
-apt-get install -y postgresql postgresql-contrib
+echo "Встановлення PostgreSQL та curl..."
+apt-get update -y
+apt-get install -y postgresql postgresql-contrib curl
 
 echo "Запуск PostgreSQL..."
 systemctl enable --now postgresql
@@ -41,13 +42,13 @@ HBA_CONF=$(sudo -u postgres psql -t -P format=unaligned -c "SHOW hba_file;")
 
 sed -i "s/^#*listen_addresses\s*=.*/listen_addresses = '*'/" "$PG_CONF"
 
-for ip in "${ALLOWED_IPS[@]}"; do
-  HBA_RULE="host    all             all             ${ip}         scram-sha-256"
-  grep -qxF "$HBA_RULE" "$HBA_CONF" || echo "$HBA_RULE" >> "$HBA_CONF"
-  sudo iptables -A INPUT -p tcp --dport 5432 -s ${ip} -j ACCEPT
-done
+HBA_RULE="host    all             all             ${ALLOWED_NETWORK}         scram-sha-256"
+grep -qxF "$HBA_RULE" "$HBA_CONF" || echo "$HBA_RULE" >> "$HBA_CONF"
+
+echo "Налаштування фаєрволу..."
+sudo iptables -A INPUT -p tcp --dport 5432 -s "${ALLOWED_NETWORK}" -j ACCEPT
+sudo netfilter-persistent save
 
 echo "Перезапуск PostgreSQL..."
 systemctl restart postgresql
 
-sudo netfilter-persistent save

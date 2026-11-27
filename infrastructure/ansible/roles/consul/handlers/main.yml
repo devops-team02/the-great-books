@@ -1,0 +1,8 @@
+---
+- name: Reload Consul
+  ansible.builtin.systemd:
+    name: consul
+    state: reloaded
+
+- name: Save firewall rules
+  ansible.builtin.command: netfilter-persistent save

@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-NFS_SERVER="192.168.56.10"
+NFS_SERVER="nfs-server.service.consul"
 LOCAL_DIR="/opt/web/app/static/pictures"
 REMOTE_DIR="/media/pictures"
 USER="www-data"

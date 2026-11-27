@@ -1,0 +1,103 @@
+---
+- name: Install prerequisite packages
+  ansible.builtin.apt:
+    name:
+      - gnupg
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Download HashiCorp GPG key (ASCII armored)
+  ansible.builtin.get_url:
+    url: https://apt.releases.hashicorp.com/gpg
+    dest: /tmp/hashicorp.asc
+    mode: '0644'
+
+- name: Dearmor HashiCorp GPG key into keyring
+  ansible.builtin.command:
+    cmd: gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg /tmp/hashicorp.asc
+    creates: /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+- name: Remove temporary ASCII key
+  ansible.builtin.file:
+    path: /tmp/hashicorp.asc
+    state: absent
+
+- name: Add HashiCorp APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main"
+    state: present
+    filename: hashicorp
+
+- name: Install Consul package
+  ansible.builtin.apt:
+    name: consul
+    state: present
+    update_cache: true
+
+- name: Create directories for Consul
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: consul
+    group: consul
+    mode: '0755'
+  loop:
+    - /etc/consul.d
+    - /var/lib/consul
+
+- name: Generate Consul configuration
+  ansible.builtin.copy:
+    src: consul.hcl
+    dest: "/etc/consul.d/consul.hcl"
+    group: consul
+    owner: consul
+    mode: '0644'
+  notify: Reload Consul
+
+- name: Ensure consul systemd override directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/consul.service.d
+    state: directory
+    mode: '0755'
+
+- name: Configure systemd override for Consul (Type=exec)
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/consul.service.d/override.conf
+    content: |
+      [Service]
+      Type=exec
+    mode: '0644'
+  register: consul_systemd_override
+
+- name: Reload systemd daemon if override changed
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: consul_systemd_override.changed
+
+- name: Enable and start Consul service
+  ansible.builtin.systemd:
+    name: consul
+    enabled: true
+    state: started
+
+- name: Allow Consul traffic
+  ansible.builtin.iptables:
+    chain: INPUT
+    protocol: "{{ item.proto }}"
+    destination_port: "{{ item.port }}"
+    ctstate: NEW
+    jump: ACCEPT
+    comment: "Accept Consul {{ item.name }} ({{ item.proto }}/{{ item.port }})"
+  loop:
+    - { port: 8300, proto: tcp, name: "Server RPC" }
+    - { port: 8301, proto: tcp, name: "Serf LAN TCP" }
+    - { port: 8301, proto: udp, name: "Serf LAN UDP" }
+    - { port: 8302, proto: tcp, name: "Serf WAN TCP" }
+    - { port: 8302, proto: udp, name: "Serf WAN UDP" }
+    - { port: 8500, proto: tcp, name: "HTTP API" }
+    - { port: 8501, proto: tcp, name: "HTTPS API" }
+    - { port: 8502, proto: tcp, name: "gRPC API" }
+    - { port: 8600, proto: tcp, name: "DNS TCP" }
+    - { port: 8600, proto: udp, name: "DNS UDP" }
+  notify: Save firewall rules

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Tournament Details — The Great Books{% endblock %}
+
+{% block content %}
+<section class="page">
+    <div class="page-header">
+        <div>
+            <a href="/tournaments" class="btn-secondary" style="margin-bottom: 0.8rem;">&larr; Back to Tournaments</a>
+            <h1 id="detail-title">Loading Tournament...</h1>
+            <p id="detail-host" class="subtitle"></p>
+        </div>
+        <div id="detail-action-area"></div>
+    </div>
+
+    <div id="detail-info-banner" class="notice-banner hidden"></div>
+
+    <h3 style="margin-bottom: 1rem; color: var(--gold);">Registered Knights (<span id="detail-count">0</span>)</h3>
+    <div id="participants-grid" class="cards-grid"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='tournaments.js') }}"></script>
+{% endblock %}

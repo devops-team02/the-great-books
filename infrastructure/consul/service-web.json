@@ -1,0 +1,13 @@
+{
+  "service": {
+    "name": "the-great-books-web",
+    "tags": ["web", "vagrant"],
+    "port": 80,
+    "check": {
+      "http": "http://127.0.0.1:80/api/health",
+      "interval": "10s",
+      "timeout": "2s",
+      "deregister_critical_service_after": "1m"
+    }
+  }
+}

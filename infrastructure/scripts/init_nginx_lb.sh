@@ -3,34 +3,53 @@
 set -euo pipefail
 
 SITE_NAME="the-great-books"
+CONSUL_TEMPLATE_VERSION="0.39.0"
 
-apt-get install -y nginx curl
+echo "Installing Nginx, curl and unzip..."
+apt-get update -y
+apt-get install -y nginx curl unzip
 
+echo "Installing consul-template..."
+if [ ! -f /usr/local/bin/consul-template ]; then
+  curl -sSL "https://releases.hashicorp.com/consul-template/${CONSUL_TEMPLATE_VERSION}/consul-template_${CONSUL_TEMPLATE_VERSION}_linux_amd64.zip" -o /tmp/consul-template.zip
+  unzip -o /tmp/consul-template.zip -d /usr/local/bin/
+  chmod +x /usr/local/bin/consul-template
+  rm -f /tmp/consul-template.zip
+fi
 
-cat > "/etc/nginx/sites-available/${SITE_NAME}" <<'EOF'
+echo "Налаштування шаблону Nginx для Consul..."
+mkdir -p /etc/nginx/templates /etc/consul-template.d
+cp /tmp/nginx.conf.ctmpl /etc/nginx/templates/nginx.conf.ctmpl
 
-upstream the_great_books {
-    server 192.168.56.2:80 max_fails=3 fail_timeout=10s;
-    server 192.168.56.3:80 max_fails=3 fail_timeout=10s;
+cat > /etc/consul-template.d/consul-template.hcl <<EOF
+consul {
+  address = "127.0.0.1:8500"
 }
 
-server {
-    listen 80 default_server;
-    server_name _;
-
-    location / {
-        proxy_pass http://the_great_books;
-
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-
-        proxy_connect_timeout 5s;
-        proxy_read_timeout 30s;
-    }
+template {
+  source      = "/etc/nginx/templates/nginx.conf.ctmpl"
+  destination = "/etc/nginx/sites-available/${SITE_NAME}"
+  command     = "nginx -t && systemctl reload nginx"
 }
 EOF
+
+cat > /etc/systemd/system/consul-template.service <<EOF
+[Unit]
+Description=Consul Template for Nginx
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/consul-template -config=/etc/consul-template.d/consul-template.hcl
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo "Initializing Nginx..."
+/usr/local/bin/consul-template -config=/etc/consul-template.d/consul-template.hcl -once || true
 
 ln -sfn "/etc/nginx/sites-available/${SITE_NAME}" \
     "/etc/nginx/sites-enabled/${SITE_NAME}"
@@ -41,6 +60,10 @@ nginx -t
 
 systemctl enable nginx
 systemctl restart nginx
+
+systemctl daemon-reload
+systemctl enable consul-template
+systemctl restart consul-template
 
 echo "Налаштування фаєрволу LB та збереження конфігурації..."
 

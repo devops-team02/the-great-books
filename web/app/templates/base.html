@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}The Great Books — Seven Kingdoms Registry{% endblock %}</title>
+    <title>{% block title %}The Great Books — Kingdoms Registry{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
@@ -14,11 +14,17 @@
             <span class="crown">⚔️</span> The Great Books
         </a>
         <nav class="nav-links">
-            <a class="nav-btn {{ 'active' if request.path == '/knights' else '' }}" id="nav-knights" href="/knights">Book of Knights</a>
-            <a class="nav-btn {{ 'active' if request.path == '/lords' else '' }}" id="nav-lords" href="/lords">Book of Lords</a>
-            <a class="nav-btn {{ 'active' if request.path in ['/', '/houses'] else '' }}" id="nav-houses" href="/">Great Houses</a>
-            <a class="nav-btn hidden {{ 'active' if request.path == '/profile' else '' }}" id="nav-profile" href="/profile">My Profile</a>
-            <a class="nav-btn {{ 'active' if request.path == '/login' else '' }}" id="nav-auth" href="/login">Login / Register</a>
+            <a class="nav-btn {{ 'active' if request.path == '/knights' else '' }}" id="nav-knights"
+                href="/knights">Book of Knights</a>
+            <a class="nav-btn {{ 'active' if request.path == '/lords' else '' }}" id="nav-lords" href="/lords">Book of
+                Lords</a>
+            <a class="nav-btn {{ 'active' if request.path in ['/', '/houses'] else '' }}" id="nav-houses" href="/">Great
+                Houses</a>
+            <a href="/tournaments" class="nav-btn">Tournaments</a>
+            <a class="nav-btn hidden {{ 'active' if request.path == '/profile' else '' }}" id="nav-profile"
+                href="/profile">My Profile</a>
+            <a class="nav-btn {{ 'active' if request.path == '/login' else '' }}" id="nav-auth" href="/login">Login /
+                Register</a>
             <button class="nav-btn btn-danger hidden" id="nav-logout" onclick="logout()">Logout</button>
         </nav>
     </header>
