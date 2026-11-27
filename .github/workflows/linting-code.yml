@@ -3,8 +3,6 @@ name: Linting Python, Ansible, Packer & Vagrant
 run-name: '${{ github.event_name }}: ${{ github.head_ref }} by ${{ github.actor }}'
 
 on: 
-  # push:
-  #   branches: ["main"]
   pull_request:
     branches: ["main"]
 
@@ -36,36 +34,3 @@ jobs:
         run: |
           ruff check --config ${{env.path_to_linter_cfgs}}/ruff.toml
         working-directory: web
-
-
-
-
-    # TODO:
-    # Add linting for Packer, Ansible, Vagrant & Jenkins CI/CD 
-   
-      # - name: Lint Packer code
-      #   run: |
-      #     apt install -y packer
-      #     packer validate
-      #   working-directory: infrastructure/packer
-
-        
-      # - name: Lint Ansible code
-      #   run: |
-      #     apt install -y ansible-lint
-      #     ansible-lint
-      #   working-directory: infrastructure/ansible
-    
-      # - name: Lint Vagrantfile
-      #   run: |
-      #     vagrant validate
-      #   working-directory: infrastructure
-
-      # - name: Lint Jenkinsfile
-      #   run: |
-      #     pip install jenkinsfilelint
-      #     jenkinsfilelint Jenkinsfile
-      #     working-directory: infrastructure/Jenkins
-
-      # TODO CHECKER FOR 85%:
-
