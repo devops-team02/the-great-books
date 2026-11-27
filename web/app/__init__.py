@@ -1,10 +1,9 @@
 from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
-
 from .config import Config
-from .extensions import cors, db, migrate
-from .models import House, Role
+from .extensions import db, cors, migrate
 from .routes import api, web_ui
+from .models import Role, House
 
 
 def create_app():
