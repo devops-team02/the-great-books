@@ -1,8 +1,6 @@
 from datetime import datetime
-
-from sqlalchemy import CheckConstraint, Index, text
-
 from .extensions import db
+from sqlalchemy import CheckConstraint, Index, text
 
 
 class Role(db.Model):
@@ -32,10 +30,7 @@ class User(db.Model):
     nightwatch = db.Column(db.Boolean, nullable=True)
 
     __table_args__ = (
-        CheckConstraint(
-            "length(username) >= 5 AND length(username) <= 20",
-            name="check_username",
-        ),
+        CheckConstraint("length(username) >= 5 AND length(username) <= 20", name="check_username"),
         Index("ix_users_role_id", "role_id"),
         Index("ix_users_house_id", "house_id"),
         Index(
@@ -54,14 +49,9 @@ class House(db.Model):
     motto = db.Column(db.String(30), nullable=False)
 
     __table_args__ = (
-        CheckConstraint(
-            "length(name) >= 5 AND length(name) <= 20", name="check_name"
-        ),
-        CheckConstraint(
-            "length(motto) >= 5 AND length(motto) <= 30", name="check_motto"
-        ),
+        CheckConstraint("length(name) >= 5 AND length(name) <= 20", name="check_name"),
+        CheckConstraint("length(motto) >= 5 AND length(motto) <= 30", name="check_motto"),
     )
-
 
 class Stat(db.Model):
     __tablename__ = "stats"
@@ -72,18 +62,12 @@ class Stat(db.Model):
     endurance = db.Column(db.Integer, default=10)
     key = db.Column(db.String(64), nullable=True)
     next_key = db.Column(db.DateTime, nullable=True)
-    gossip_target_id = db.Column(
-        db.Integer, db.ForeignKey("users.id"), nullable=True
-    )
+    gossip_target_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
 
     __table_args__ = (
-        CheckConstraint(
-            "strength >= 0 AND strength <= 20", name="check_strength"
-        ),
+        CheckConstraint("strength >= 0 AND strength <= 20", name="check_strength"),
         CheckConstraint("defense >= 0 AND defense <= 20", name="check_defense"),
-        CheckConstraint(
-            "endurance >= 0 AND endurance <= 20", name="check_endurance"
-        ),
+        CheckConstraint("endurance >= 0 AND endurance <= 20", name="check_endurance"),
     )
 
 
