@@ -92,12 +92,6 @@ async function loadDictionaries() {
         const filterLords = document.getElementById("filter-lords");
         if (filterLords) filterLords.innerHTML = houseOptionsHtml;
 
-        const houseSelect = document.getElementById("reg-house");
-        if (houseSelect) {
-            houseSelect.innerHTML = '<option value="">No House (Free Rider / Commonfolk)</option>' +
-                houses.map(h => '<option value="' + h.id + '">House ' + h.name + '</option>').join("");
-        }
-
         const params = new URLSearchParams(window.location.search);
         const houseParam = params.get("house");
         if (houseParam) {

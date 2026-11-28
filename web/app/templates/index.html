@@ -9,26 +9,28 @@
             <h1>Great Houses of Westeros</h1>
             <p class="subtitle">Noble Bloodlines & Seat Allegiances</p>
         </div>
-        <span class="role-badge" id="houses-count">0 Houses</span>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <button type="button" id="create-house-button" class="btn-primary hidden"
+                onclick="openCreateHouseForm()">Create House</button>
+            <span class="role-badge" id="houses-count">0 Houses</span>
+        </div>
     </div>
-    <div id="houses-grid" class="houses-grid"></div>
-
-    <div id="edit-house-wrapper" class="auth-wrapper hidden" style="margin-top: 2rem;">
-        <form id="edit-house-form" class="auth-form" onsubmit="handleEditHouse(event)">
-            <h2 id="edit-house-title">Edit House Info</h2>
-            <input type="hidden" id="edit-house-id">
+    <div id="create-house-wrapper" class="auth-wrapper hidden" style="margin: 1.5rem auto;">
+        <form id="create-house-form" class="auth-form" onsubmit="handleCreateHouse(event)">
+            <h2>Create a Great House</h2>
             <label>House Name
-                <input type="text" id="edit-house-name" maxlength="50" required>
+                <input type="text" id="create-house-name" maxlength="20" required>
             </label>
             <label>House Motto
-                <input type="text" id="edit-house-motto" maxlength="100" placeholder="Enter house motto...">
+                <input type="text" id="create-house-motto" maxlength="30" required>
             </label>
             <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-                <button type="submit" class="btn-primary" style="flex: 1; margin-top: 0;">Save Changes</button>
-                <button type="button" class="btn-secondary" onclick="closeEditHouseForm()">Cancel</button>
+                <button type="submit" class="btn-primary" style="flex: 1; margin-top: 0;">Create House</button>
+                <button type="button" class="btn-secondary" onclick="closeCreateHouseForm()">Cancel</button>
             </div>
         </form>
     </div>
+    <div id="houses-grid" class="houses-grid"></div>
 </section>
 {% endblock %}
 

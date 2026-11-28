@@ -12,18 +12,12 @@
                 style="margin-top: 0.25rem; padding: 0.65rem 0.85rem; border: 1px solid rgba(212, 175, 55, 0.35); border-radius: 6px; background: rgba(255, 255, 255, 0.03);">
                 <label for="reg-white-knight"
                     style="display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: flex-start !important; gap: 0.65rem; margin: 0 !important; cursor: pointer; text-align: left;">
-                    <input type="checkbox" id="reg-white-knight" onchange="onWhiteKnightToggle()"
+                    <input type="checkbox" id="reg-white-knight"
                         style="width: 18px !important; height: 18px !important; min-width: 18px; margin: 0 !important; accent-color: #d4af37; cursor: pointer; flex-shrink: 0;">
                     <span style="line-height: 1.3;">Is White Knight? <small class="muted">(Kingsguard — sworn to no
                             Great House)</small></span>
                 </label>
             </div>
-
-            {#<label id="reg-house-label">Great House Allegiance
-                <select id="reg-house" required>
-                    <option value="">Choose a Great House...</option>
-                </select>
-            </label>#}
 
             <label>Strength (0 - 20)
                 <input type="number" id="knight-str" value="15" required>
@@ -36,38 +30,6 @@
             <label>Endurance (0 - 20)
                 <input type="number" id="knight-end" value="15" required>
             </label>
-
-            <div class="photo-upload-block" style="margin-top: 0.25rem;">
-                <span style="display: block; margin-bottom: 0.4rem; font-size: 0.9rem; color: var(--text-muted);">
-                    Portrait / Coat of Arms <span style="color: #d4af37;">*</span>
-                </span>
-                <div id="photo-dropzone" onclick="document.getElementById('reg-photo').click()"
-                    ondragover="handlePhotoDragOver(event)" ondragleave="handlePhotoDragLeave(event)"
-                    ondrop="handlePhotoDrop(event)"
-                    style="border: 1px dashed rgba(212, 175, 55, 0.45); border-radius: 8px; padding: 0.9rem; text-align: center; background: rgba(255, 255, 255, 0.02); cursor: pointer;">
-                    <input type="file" id="reg-photo" accept="image/png, image/jpeg, image/webp" class="hidden"
-                        onchange="handlePhotoSelect(event)">
-
-                    <div id="photo-placeholder"
-                        style="display: flex; flex-direction: column; align-items: center; gap: 0.3rem;">
-                        <span style="font-size: 1.4rem; color: #d4af37;">&#9876;</span>
-                        <span style="font-size: 0.9rem;">Click or drag a portrait image here</span>
-                        <small class="muted" style="font-size: 0.78rem;">PNG, JPG, WEBP up to 5 MB</small>
-                    </div>
-
-                    <div id="photo-preview-wrap" class="hidden"
-                        style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
-                        <img id="photo-preview-img" src="" alt="Preview"
-                            style="width: 76px; height: 76px; object-fit: cover; border-radius: 50%; border: 2px solid #d4af37;">
-                        <span id="photo-file-name"
-                            style="font-size: 0.82rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
-                        <button type="button" onclick="clearSelectedPhoto(event)"
-                            style="background: rgba(220, 53, 69, 0.15); border: 1px solid rgba(220, 53, 69, 0.5); color: #ff8a93; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.78rem; cursor: pointer;">
-                            Remove photo
-                        </button>
-                    </div>
-                </div>
-            </div>
 
             <button type="submit" class="btn-primary">Finish Registration</button>
         </form>

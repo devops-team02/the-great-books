@@ -13,13 +13,6 @@ function getHouseMotto(house) {
     return DEFAULT_HOUSE_MOTTOS[house.name] || "Words Unrecorded";
 }
 
-function canEditHouse(house) {
-    if (!currentUser) return false;
-    if (currentUser.house_id !== house.id) return false;
-    const role = (currentUser.role || "").toLowerCase();
-    return role === "noble";
-}
-
 function renderHousesPage() {
     const grid = document.getElementById("houses-grid");
     if (!grid) return;
@@ -28,6 +21,9 @@ function renderHousesPage() {
     if (countEl) countEl.textContent = housesList.length + " Great Houses";
 
     const role = (currentUser?.role || "").toLowerCase();
+    const createHouseButton = document.getElementById("create-house-button");
+    const canCreateHouse = currentUser && role === "noble" && !currentUser.house_id;
+    if (createHouseButton) createHouseButton.classList.toggle("hidden", !canCreateHouse);
     const canRequest = currentUser && role !== "commonfolk" && !currentUser.house_id && !currentUser.is_white_knight;
 
     grid.innerHTML = housesList.map(h => {
@@ -43,17 +39,12 @@ function renderHousesPage() {
                 requestBtnHtml = `<button type="button" class="btn-primary" style="margin-top: 0.75rem; width: 100%;" onclick="sendJoinRequest(${h.id})">Send join request</button>`;
             }
         }
-        const editable = canEditHouse(h);
-
         return (
             '<div class="house-card">' +
             '<div class="house-banner" style="' + bannerStyle + '">House ' + h.name + '</div>' +
             '<div class="house-card-body">' +
             '<div class="card-motto">"' + motto + '"</div>' +
             (isMyHouse ? '<span class="role-badge">Your Allegiance</span>' : '') +
-            (editable
-                ? '<button class="btn-primary" style="padding: 0.5rem; font-size: 0.9rem;" onclick="openEditHouseForm(' + h.id + ')">✏️ Edit House Info</button>'
-                : '') +
             requestBtnHtml +
             '<div style="display:flex; gap:0.5rem; margin-top:auto;">' +
             '<button class="btn-secondary" style="flex:1" onclick="filterHouseInBook(\'knights\', ' + h.id + ')">Knights</button>' +
@@ -65,54 +56,45 @@ function renderHousesPage() {
     }).join("");
 }
 
-
-function openEditHouseForm(houseId) {
-    const house = housesMap[houseId];
-    if (!house) return;
-
-    const currentMotto = getHouseMotto(house);
-
-    document.getElementById("edit-house-id").value = house.id;
-    document.getElementById("edit-house-title").textContent = "Edit House " + house.name;
-    document.getElementById("edit-house-name").value = house.name;
-    document.getElementById("edit-house-motto").value = currentMotto === "Words Unrecorded" ? "" : currentMotto;
-
-    const wrapper = document.getElementById("edit-house-wrapper");
+function openCreateHouseForm() {
+    const wrapper = document.getElementById("create-house-wrapper");
+    if (!wrapper) return;
     wrapper.classList.remove("hidden");
     wrapper.scrollIntoView({ behavior: "smooth" });
 }
 
-function closeEditHouseForm() {
-    document.getElementById("edit-house-wrapper").classList.add("hidden");
+function closeCreateHouseForm() {
+    const wrapper = document.getElementById("create-house-wrapper");
+    if (wrapper) wrapper.classList.add("hidden");
 }
 
-async function handleEditHouse(e) {
+async function handleCreateHouse(e) {
     e.preventDefault();
-    const houseId = Number(document.getElementById("edit-house-id").value);
-    const name = document.getElementById("edit-house-name").value.trim();
-    const motto = document.getElementById("edit-house-motto").value.trim();
+    const name = document.getElementById("create-house-name").value.trim();
+    const motto = document.getElementById("create-house-motto").value.trim();
 
     try {
         if (name.length < 5 || name.length > 20) {
-            showAlert(`House name must be between 5 and 20 characters long.`, true);
+            showAlert("House name must be between 5 and 20 characters long.", true);
             return;
         }
         if (motto.length < 5 || motto.length > 30) {
-            showAlert(`House motto must be between 5 and 30 characters long.`, true);
+            showAlert("House motto must be between 5 and 30 characters long.", true);
             return;
         }
-        const res = await apiFetch("/houses/" + houseId, {
-            method: "PUT",
+        const res = await apiFetch("/houses", {
+            method: "POST",
             body: JSON.stringify({ name, motto })
         });
 
-        housesMap[houseId] = res.house;
-        housesList = housesList.map(h => (h.id === houseId ? res.house : h));
-
-        closeEditHouseForm();
+        housesList.push(res.house);
+        housesMap[res.house.id] = res.house;
+        currentUser = await apiFetch("/me");
+        document.getElementById("create-house-form").reset();
+        closeCreateHouseForm();
         renderHousesPage();
         updateNavUI(currentUser);
-        showAlert("House " + res.house.name + " info updated!");
+        showAlert(res.message);
     } catch (err) {
         showAlert(err.message, true);
     }

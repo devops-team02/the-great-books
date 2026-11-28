@@ -13,11 +13,11 @@ from .extensions import db
 from .models import User, Role, House, Stat, Session, Requests, Tournament, Participant
 
 web_ui = Blueprint("web_ui", __name__, url_prefix="/")
-photo_path = "./app/static/pictures/"  #path for uploaded photos
+photo_path = os.path.join(os.path.dirname(__file__), "static", "pictures")
 
 @web_ui.before_request
 def require_auth():
-    if request.path in ("/login", "/lord-setup", "/knight-setup") or request.path.startswith("/static"):
+    if request.path in ("/login", "/knight-setup") or request.path.startswith("/static"):
         return None
     if is_banished_ip():
         if request.path != "/nightwatch":
@@ -76,10 +76,6 @@ def house():
 def nightwatch():
     return render_template("nightwatch.html")
   
-@web_ui.route("/lord-setup")
-def lord_setup():
-    return render_template("lord_setup.html")
-
 @web_ui.route("/knight-setup")
 def knight_setup():
     return render_template("knight_setup.html")
@@ -152,12 +148,45 @@ def get_houses():
     return jsonify(result), 200
 
 
+@api.route("/houses", methods=["POST"])
+@login_required
+def create_house(current_user):
+    role_name = current_user.role.role_name.lower() if current_user.role else ""
+    if role_name != "noble":
+        return jsonify({"error": "Only lords can create a Great House"}), 403
+    if current_user.house_id is not None:
+        return jsonify({"error": "You already belong to a Great House"}), 400
+
+    data = request.get_json() or {}
+    name = str(data.get("name", "")).strip()
+    motto = str(data.get("motto", "")).strip()
+    if len(name) < 5 or len(name) > 20:
+        return jsonify({"error": "House name must be between 5 and 20 characters"}), 400
+    if len(motto) < 5 or len(motto) > 30:
+        return jsonify({"error": "Motto must be between 5 and 30 characters"}), 400
+    if House.query.filter_by(name=name).first():
+        return jsonify({"error": "A house with this name already exists"}), 409
+
+    house = House(name=name, motto=motto)
+    db.session.add(house)
+    db.session.flush()
+    current_user.house_id = house.id
+    db.session.commit()
+
+    return jsonify({
+        "message": f"House {house.name} created successfully",
+        "house": {"id": house.id, "name": house.name, "motto": house.motto},
+    }), 201
+
+
 @api.route("/auth/register", methods=["POST"])
 def register():
-    data = request.get_json() or {}
-    username = data.get("username", "").strip()
+    is_multipart = request.content_type and "multipart/form-data" in request.content_type
+    data = request.form if is_multipart else (request.get_json() or {})
+    username = str(data.get("username", "")).strip()
     password = data.get("password", "")
     role_id = data.get("role_id")
+    photo = request.files.get("photo") if is_multipart else None
 
     if not username or not password or not role_id:
         return jsonify({"error": "username, password and role_id are required"}), 400
@@ -167,6 +196,17 @@ def register():
 
     if len(password) < 8 or len(password) > 20:
         return jsonify({"error": "Password must be between 8 and 20 characters"}), 400
+
+    if photo and photo.filename:
+        allowed_exts = {"png", "jpg", "jpeg", "webp"}
+        ext = photo.filename.rsplit(".", 1)[-1].lower() if "." in photo.filename else ""
+        if ext not in allowed_exts:
+            return jsonify({"error": "Invalid format. Please choose PNG, JPG, or WEBP."}), 400
+        photo.seek(0, os.SEEK_END)
+        file_size = photo.tell()
+        photo.seek(0)
+        if file_size > 5 * 1024 * 1024:
+            return jsonify({"error": "Image is too large. Maximum size is 5 MB."}), 400
 
     if User.query.filter_by(username=username).first():
         return jsonify({"error": "Username already taken"}), 409
@@ -184,6 +224,9 @@ def register():
     )
     db.session.add(user)
     db.session.flush()
+
+    if photo and photo.filename:
+        user.photo_url = save_uploaded_photo(photo, user.id, user.username)
 
     if role.role_name.lower() == "knight":
         stat = Stat(user_id=user.id, strength=10, defense=10, endurance=10)
@@ -208,6 +251,7 @@ def register():
             "username": user.username,
             "role": role.role_name,
             "house_id": user.house_id,
+            "photo_url": user.photo_url,
         }
     }), 201)
     response.set_cookie(
@@ -773,38 +817,13 @@ def save_uploaded_photo(photo, user_id, user_name):
     if ext not in ("png", "jpg", "jpeg", "webp"):
         return None
 
-    photo_name = f"{user_name}-{random.randint(0, 100)}.jpg"
+    safe_user_name = secure_filename(user_name) or str(user_id)
+    photo_name = f"{safe_user_name}-{random.randint(0, 100)}.jpg"
+    os.makedirs(photo_path, exist_ok=True)
     with open(f"{photo_path}/{photo_name}", "wb") as f:
         f.write(photo.read())
 
     return photo_name
-
-
-@api.route("/lords/setup", methods=["POST"])
-@login_required
-def setup_lord(current_user):
-    if current_user.role.role_name.lower() != "noble":
-        return jsonify({"error": "Only lords can access this"}), 403
-
-    house_raw = (request.form.get("house_id") or "").strip()
-    photo = request.files.get("photo")
-
-    if not house_raw:
-        return jsonify({"error": "House is required"}), 400
-
-    house = House.query.get(int(house_raw))
-    if not house:
-        return jsonify({"error": "House not found"}), 404
-
-    photo_url = save_uploaded_photo(photo, current_user.id, current_user.username)
-    if not photo_url:
-        return jsonify({"error": "Valid photo (png, jpg, webp) is required"}), 400
-
-    current_user.photo_url = photo_url
-    current_user.house_id = house.id
-
-    db.session.commit()
-    return jsonify({"message": "Lord profile saved"}), 200
 
 
 @api.route("/knights/setup", methods=["POST"])
@@ -827,11 +846,11 @@ def setup_knight(current_user):
         if not (0 <= stat_val <= 20):
             return jsonify({"error": f"{stat_name} must be between 0 and 20"}), 400
 
-    photo_url = save_uploaded_photo(photo, current_user.id, current_user.username)
-    if not photo_url:
-        return jsonify({"error": "Valid photo (png, jpg, webp) is required"}), 400
-
-    current_user.photo_url = photo_url
+    if photo and photo.filename:
+        photo_url = save_uploaded_photo(photo, current_user.id, current_user.username)
+        if not photo_url:
+            return jsonify({"error": "Valid photo (png, jpg, webp) is required"}), 400
+        current_user.photo_url = photo_url
     current_user.is_white_knight = is_white_knight
     current_user.house_id = None
 

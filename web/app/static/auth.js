@@ -28,13 +28,7 @@ async function handleLogin(e) {
         showAlert("Welcome back to the realm, " + res.user.username + "!");
         setTimeout(() => {
             const role = res.user.role.toLowerCase();
-            if (role === "noble" && !currentUser.photo_url) {
-                window.location.href = "/lord-setup";
-            } else if (role === "knight" && !currentUser.photo_url) {
-                window.location.href = "/knight-setup";
-            } else {
-                window.location.href = role === "noble" ? "/lords" : "/knights";
-            }
+            window.location.href = role === "noble" ? "/lords" : "/knights";
         }, 300);
     } catch (err) {
         showAlert(err.message, true);
@@ -60,16 +54,20 @@ async function handleRegister(e) {
             showAlert(`Password must be between 8 and 20 characters long.`, true);
             return;
         }
+        const formData = new FormData();
+        formData.append("username", username);
+        formData.append("password", password);
+        formData.append("role_id", String(role_id));
+        if (selectedPhotoFile) formData.append("photo", selectedPhotoFile);
+
         const res = await apiFetch("/auth/register", {
             method: "POST",
-            body: JSON.stringify({ username, password, role_id })
+            body: formData
         });
         await checkAuth();
 
         const role = res.user.role.toLowerCase();
-        if (role === "noble") {
-            window.location.href = "/lord-setup";
-        } else if (role === "knight") {
+        if (role === "knight") {
             window.location.href = "/knight-setup";
         } else {
             showAlert("Account created!");
@@ -159,17 +157,4 @@ function clearSelectedPhoto(e) {
     if (previewImg) previewImg.src = "";
     if (previewWrap) previewWrap.classList.add("hidden");
     if (placeholder) placeholder.classList.remove("hidden");
-}
-
-function onWhiteKnightToggle() {
-    const wkCheckbox = document.getElementById("reg-white-knight");
-    const houseSelect = document.getElementById("reg-house");
-    if (!wkCheckbox || !houseSelect) return;
-
-    if (wkCheckbox.checked) {
-        houseSelect.value = "";
-        houseSelect.disabled = true;
-    } else {
-        houseSelect.disabled = false;
-    }
 }
