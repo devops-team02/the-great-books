@@ -4,6 +4,10 @@ packer {
       version = ">= 1.1.0"
       source  = "github.com/hashicorp/vagrant"
     }
+    ansible = {
+      version = ">= 1.1.0"
+      source  = "github.com/hashicorp/ansible"
+    }
   }
 }
 
@@ -18,8 +22,8 @@ source "vagrant" "base" {
 build {
   sources = ["source.vagrant.base"]
 
-  provisioner "shell" {
-    execute_command = "sudo -S sh -c '{{ .Vars }} {{ .Path }}'"
-    script          = "scripts/provision_base.sh"
+  provisioner "ansible" {
+    playbook_file = "./playbook.yml"
+    roles_path    = "../../ansible/roles"
   }
 }

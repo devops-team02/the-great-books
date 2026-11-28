@@ -1,0 +1,6 @@
+---
+- name: Provision base image
+  hosts: all
+  become: true
+  roles:
+    - common
