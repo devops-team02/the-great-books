@@ -3,7 +3,7 @@
 ## Project Structure:
 
 - `web/` - Flask REST API application and static files
-- `infrastructure/` - Vagrant configuration, Consul, and VM setup scripts
+- `infrastructure/` - Vagrant configuration, Packer base image templates, Consul, and VM setup scripts
 ---
 # SETUP GUIDE
 
@@ -11,6 +11,7 @@
 
 - VirtualBox: https://www.virtualbox.org/wiki/Downloads
 - Vagrant: https://developer.hashicorp.com/vagrant/install
+- Packer: https://developer.hashicorp.com/packer/install
 - GitLeaks: *Install guide below*
 
 ## Environment Setup
@@ -36,6 +37,23 @@ Before starting the infrastructure or running the app locally, create a `.env` f
 ```shell
 cp .env.example .env
 ```
+
+## Build Base Image (Packer):
+
+The VMs use a base Vagrant box (`the-great-books-base`) containing Ubuntu 22.04 LTS, `consul`, `iptables-persistent`, and core system dependencies. Build and register it locally before running `vagrant up`:
+
+1. Navigate to the base image directory, initialize plugins, and build the box:
+   ```shell
+   cd infrastructure/packer/base
+   packer init .
+   packer build .
+   ```
+
+2. Register the generated box in Vagrant (from `infrastructure/`):
+   ```shell
+   cd ../..
+   vagrant box add --force the-great-books-base packer/builds/base/package.box
+   ```
 
 ## Create VMs:
 
