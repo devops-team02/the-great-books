@@ -40,14 +40,22 @@ function showAlert(message, isError = false) {
     setTimeout(() => box.classList.add("hidden"), 5000);
 }
 
+function getHouseBannerStyle(houseId) {
+    if (houseId === null || houseId === undefined || houseId === "" || isNaN(Number(houseId))) {
+        return "background: linear-gradient(135deg, #1f242d 0%, #353b48 100%);";
+    }
+
+    const id = Number(houseId);
+    // Золотий перетин (Golden Angle ~137.5 deg) дає максимальний розкид відтінків між послідовними ID 1, 2, 3...
+    const hue = Math.round((id * 137.508) % 360);
+    const colorStart = `hsl(${hue}, 75%, 28%)`;
+    const colorEnd = `hsl(${(hue + 40) % 360}, 85%, 46%)`;
+
+    return `background: linear-gradient(135deg, ${colorStart} 0%, ${colorEnd} 100%);`;
+}
+
 function getHouseBannerClass(houseName) {
-    if (!houseName) return "banner-default";
-    const key = houseName.toLowerCase();
-    if (key.includes("stark")) return "banner-stark";
-    if (key.includes("lannister")) return "banner-lannister";
-    if (key.includes("targaryen")) return "banner-targaryen";
-    if (key.includes("baratheon")) return "banner-baratheon";
-    return "banner-default";
+    return "";
 }
 
 function getInitials(name) {
@@ -84,12 +92,6 @@ async function loadDictionaries() {
         const filterLords = document.getElementById("filter-lords");
         if (filterLords) filterLords.innerHTML = houseOptionsHtml;
 
-        const houseSelect = document.getElementById("reg-house");
-        if (houseSelect) {
-            houseSelect.innerHTML = '<option value="">No House (Free Rider / Commonfolk)</option>' +
-                houses.map(h => '<option value="' + h.id + '">House ' + h.name + '</option>').join("");
-        }
-
         const params = new URLSearchParams(window.location.search);
         const houseParam = params.get("house");
         if (houseParam) {
@@ -113,12 +115,15 @@ async function checkAuth() {
 
 function updateNavUI(user) {
     const isLoggedIn = Boolean(user);
+    const hasHouse = isLoggedIn && user.house_id !== null;
     const navProfile = document.getElementById("nav-profile");
     if (navProfile) navProfile.classList.toggle("hidden", !isLoggedIn);
     const navLogout = document.getElementById("nav-logout");
     if (navLogout) navLogout.classList.toggle("hidden", !isLoggedIn);
     const navAuth = document.getElementById("nav-auth");
     if (navAuth) navAuth.classList.toggle("hidden", isLoggedIn);
+    const navHouse = document.getElementById("nav-house");
+    if (navHouse) navHouse.classList.toggle("hidden", !hasHouse);
 
     let badgeText = "Guest (Spectator)";
     if (user) {

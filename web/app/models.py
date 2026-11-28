@@ -53,6 +53,7 @@ class House(db.Model):
         CheckConstraint("length(motto) >= 5 AND length(motto) <= 30", name="check_motto"),
     )
 
+
 class Stat(db.Model):
     __tablename__ = "stats"
 
@@ -86,11 +87,23 @@ class Session(db.Model):
     )
 
 
+class Requests(db.Model):
+    __tablename__ = "requests"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    house_id = db.Column(db.Integer, db.ForeignKey("houses.id"), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+
+    user = db.relationship("User", backref="join_requests")
+    house = db.relationship("House", backref="join_requests")
+
+
 class Tournament(db.Model):
     __tablename__ = "tournaments"
 
     id = db.Column(db.Integer, primary_key=True)
-    lord_id =  db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    lord_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     tournament_date = db.Column(db.String(30), nullable=False)
     max_participants = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -98,9 +111,9 @@ class Tournament(db.Model):
     end_date = db.Column(db.DateTime, nullable=False)
     lord = db.relationship("User", foreign_keys=[lord_id])
     participants = db.relationship("Participant", back_populates="tournament", cascade="all, delete-orphan")
-    
+
     __table_args__ = (
-        CheckConstraint("max_participants > 0", name = "check_max_participants"),
+        CheckConstraint("max_participants > 0", name="check_max_participants"),
     )
 
 
@@ -108,7 +121,7 @@ class Participant(db.Model):
     __tablename__ = "participants"
 
     id = db.Column(db.Integer, primary_key=True)
-    knight_id =  db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    knight_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     joined_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     tournament_id = db.Column(db.Integer, db.ForeignKey("tournaments.id"), nullable=False)
     knight = db.relationship("User", foreign_keys=[knight_id])
